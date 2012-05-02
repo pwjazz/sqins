@@ -8,6 +8,8 @@ import java.sql.{ PreparedStatement, ResultSet }
 trait Expression {
   def expression: String
 
+  def selectExpression = expression
+
   /**
    * Bind this expression at the given position on the given PreparedStatement, returning the position at which
    * the next Expression should be bound.  THe expression needs to know its own state for binding.
@@ -24,15 +26,10 @@ trait Expression {
  */
 trait Extractable[+T] extends Expression {
   /**
-   * Extract the value from the given ResultSet starting at the given position, returning an Extraction.
+   * Extract the value from the given ResultSet
    */
-  def extract(rs: ResultSet, position: Int): Extraction[T]
+  def extract(rs: ResultSet): T
 }
-
-/**
- *  A value extracted from a ResultSet and the position from which the next value can be extracted.
- */
-case class Extraction[+T](value: T, nextPosition: Int)
 
 /**
  * A single-valued expression, such as a column, function call, scalar value, etc.
@@ -66,7 +63,7 @@ trait Value[+T] extends UnaryExpression with Extractable[T]
 case class BoundValue[+T](actual: T)(implicit typeMapping: TypeMapping[T]) extends Value[T] {
   val expression = "?"
 
-  def extract(rs: ResultSet, position: Int) = Extraction(actual, position)
+  def extract(rs: ResultSet) = actual
 
   override def bind(ps: PreparedStatement, position: Int) = {
     typeMapping.set(ps, position, actual)
@@ -86,7 +83,7 @@ abstract class Relation(_name: String) extends FromItem {
 
   var alias: Option[String] = None
 
-  def columns = List[Column[Any]]()
+  var columns = Seq[Column[Any]]()
 
   /**
    * Use the alias if set, otherwise the name.
@@ -100,14 +97,12 @@ abstract class Relation(_name: String) extends FromItem {
     case Some(alias: String) => "%1$s AS %2$s".format(name, alias)
     case _                   => name
   }
-
-  def addColumn(column: Column[Any]) = columns = (column :: columns).reverse
 }
 
 /**
  * Definition of a Table, including its name and columns.
  */
-class Table[T: Manifest](_name: String) extends Relation(_name) {
+abstract class Table[T: Manifest](_name: String) extends Relation(_name) {
   val rowType = manifest[T]
 
   implicit def relation = this
@@ -131,58 +126,57 @@ class Table[T: Manifest](_name: String) extends Relation(_name) {
  * A column in a relation
  */
 case class Column[+T](name: String)(implicit relation: Relation, typeMapping: TypeMapping[T]) extends Value[T] {
-  // Let the relation know about this Column
-  relation.addColumn(this)
-
   def aliasedTo(alias: Relation) = Column[T](name)(alias, typeMapping)
 
   def expression = "%1$s.%2$s".format(relation.aliasedName, name)
 
-  def extract(rs: ResultSet, position: Int) = Extraction(typeMapping.get(rs, position), position + 1)
+  override def selectExpression = "%1$s AS %2$s".format(expression, asName)
+
+  def asName = expression.replace(".", "_")
+
+  def extract(rs: ResultSet) = typeMapping.get(rs, asName)
 }
 
 /**
  * The projection of a table to a case class representing a complete row from that table.
  */
 case class Projection[T](table: Table[T]) extends Value[T] {
-  def expression = table.columns.mkString(", ")
+  def expression = table.columns.map { column => column.expression }.mkString(", ")
 
-  def extract(rs: ResultSet, position: Int): Extraction[T] = {
+  override def selectExpression = table.columns.map { column => column.selectExpression }.mkString(", ")
+
+  def extract(rs: ResultSet) = {
     val constructor = table.rowType.erasure.getConstructors()(0)
     if (table.columns.length != constructor.getParameterTypes().length) {
       // TODO: see if we can make this a compile-time check
       throw new RuntimeException("The number of columns in table does not match the number of fields in %1$s.  Please check your class definitions".format(table.rowType.erasure.getName))
     }
-    // Extract all columns
-    val extractions = table.columns.foldLeft(List[Extraction[Any]]()) { (extracts, column) =>
-      extracts.length match {
-        case 0 => column.extract(rs, position) :: extracts // first column
-        case _ => column.extract(rs, extracts(0).nextPosition) :: extracts // subsequent columns
-      }
-    }
-    // Get values from extracts
-    val columnValues = extractions.reverse.map { extraction => extraction.value }
+    // Get column values from ResultSet
+    val columnValues = table.columns.map { column => column.extract(rs) }
+
     // Construct the row
     try {
-      val row = constructor.newInstance(columnValues.map(_.asInstanceOf[Object]): _*).asInstanceOf[T]
       // Return the Extraction
-      Extraction(row, table.columns.length + 1)
+      constructor.newInstance(columnValues.map(_.asInstanceOf[Object]): _*).asInstanceOf[T]
     } catch {
-      case e: Exception => throw new RuntimeException("Unable to create row of type %1$s with values %2$s using constructor with argument types %3$s".format(table.rowType.erasure.getName, columnValues, constructor.getParameterTypes.map { clazz => clazz.getName }.mkString(", ")))
+      case e: Exception => throw new RuntimeException(
+        "Unable to create row of type %1$s with values %2$s using constructor with argument types %3$s".format(
+          table.rowType.erasure.getName,
+          columnValues,
+          constructor.getParameterTypes.map { clazz => clazz.getName }.mkString(", ")),
+        e)
     }
   }
 }
 
 case class CompoundExpression2[T1 <: Expression, T2 <: Expression](override val _1: T1, override val _2: T2) extends Tuple2(_1, _2) with Expression {
   def expression = "%1$s, %2$s".format(_1.expression, _2.expression)
+
+  override def selectExpression = "%1$s, %2$s".format(_1.selectExpression, _2.selectExpression)
 }
 
 case class CompoundExtractableExpression[T1, T2](override val _1: Extractable[T1], override val _2: Extractable[T2]) extends CompoundExpression2(_1, _2) with Extractable[Tuple2[T1, T2]] {
-  override def extract(rs: ResultSet, position: Int) = {
-    val extraction1 = this._1.extract(rs, position)
-    val extraction2 = this._2.extract(rs, extraction1.nextPosition)
-    Extraction((extraction1.value, extraction2.value), extraction2.nextPosition)
-  }
+  override def extract(rs: ResultSet) = (_1.extract(rs), _2.extract(rs))
 }
 
 /**

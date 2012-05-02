@@ -13,7 +13,7 @@ case class SelectStatement[T](select: Extractable[T], from: FromItem, where: Opt
    * Build the expression representing this query
    */
   def expression = {
-    var expression = "SELECT %1$s FROM %2$s".format(select.expression, from.fromExpression)
+    var expression = "SELECT %1$s FROM %2$s".format(select.selectExpression, from.fromExpression)
 
     where match {
       case Some(where: Condition) => expression = "%1$s WHERE %2$s".format(expression, where.expression)
@@ -48,7 +48,7 @@ case class SelectStatement[T](select: Extractable[T], from: FromItem, where: Opt
       case None                      => // ignore
     }
 
-    new SelectResult(ps.executeQuery, (rs: ResultSet) => select.extract(rs, 1))
+    new SelectResult(ps.executeQuery, (rs: ResultSet) => select.extract(rs))
   }
 
   override def toString = expression

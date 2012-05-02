@@ -6,8 +6,8 @@ import java.sql.ResultSet
 /**
  * A TypeMapping handles retrieving a Field's value from a ResultSet and for setting parameters on a PreparedStatement.
  */
-class TypeMapping[T](_get: (ResultSet, Int) => T, _set: (PreparedStatement, Int, T) => Unit) {
-  def get(rs: ResultSet, position: Int): T = _get(rs, position)
+class TypeMapping[T](_get: (ResultSet, String) => T, _set: (PreparedStatement, Int, T) => Unit) {
+  def get(rs: ResultSet, name: String): T = _get(rs, name)
 
   def set(ps: PreparedStatement, position: Int, value: T): Unit = _set(ps, position, value)
 }
@@ -17,7 +17,7 @@ class TypeMapping[T](_get: (ResultSet, Int) => T, _set: (PreparedStatement, Int,
  * to perform the actual getting and setting.
  */
 class OptionTypeMapping[T](typeMapping: TypeMapping[T]) extends TypeMapping[Option[T]](
-  _get = (rs: ResultSet, position: Int) => rs.getObject(position) match {
+  _get = (rs: ResultSet, name: String) => rs.getObject(name) match {
     case Some(value: T) => Some(value)
     case _              => None
   },
