@@ -17,8 +17,6 @@ trait Expression {
    * The default implementation does nothing and returns the same position
    */
   def bind(ps: PreparedStatement, position: Int) = position
-
-  override def toString = expression
 }
 
 /**
@@ -28,7 +26,19 @@ trait Extractable[+T] extends Expression {
   /**
    * Extract the value from the given ResultSet
    */
-  def extract(rs: ResultSet): T
+  def extract(rs: ResultSet, position: Int): Extraction[T]
+}
+
+case class Extraction[+T](value: T, columnsRead: Int)
+
+trait CompoundExtractable {
+  var columnsRead = 0
+  
+  def doExtract[T](extractable: Extractable[T], rs: ResultSet, position: Int) = {
+    val extracted = extractable.extract(rs, position + columnsRead)
+    columnsRead += extracted.columnsRead
+    extracted.value
+  }
 }
 
 /**
@@ -45,9 +55,9 @@ trait UnaryExpression extends Expression {
 
   def <(right: UnaryExpression) = Comparison(this, "<", right)
 
-  def ISNULL = Null(this)
+  def IS_NULL = Null(this)
 
-  def ISNOTNULL = NotNull(this)
+  def IS_NOT_NULL = NotNull(this)
 
   def ASC = SortedExpression(this, "ASC")
 
@@ -58,12 +68,22 @@ trait UnaryExpression extends Expression {
  * An expression that represents (or returns) a value.  Can be turned into a Condition using the operators
  * == <> != > < ISNULL ISNOTNULL
  */
-trait Value[+T] extends UnaryExpression with Extractable[T]
+trait Value[+T] extends UnaryExpression with Extractable[T] {
+  def AS(alias: String) = Alias[T, Value[T]](this, alias)
+}
+
+case class Alias[+T, +E <: Value[T]](aliased: E, alias: String) extends Extractable[T] {
+  def expression = aliased.expression
+  
+  override def selectExpression = "%1$s AS %2$s".format(aliased.expression, alias)
+  
+  def extract(rs: ResultSet, position: Int) = aliased.extract(rs, position)
+}
 
 case class BoundValue[+T](actual: T)(implicit typeMapping: TypeMapping[T]) extends Value[T] {
   val expression = "?"
 
-  def extract(rs: ResultSet) = actual
+  def extract(rs: ResultSet, position: Int) = Extraction(actual, 0)
 
   override def bind(ps: PreparedStatement, position: Int) = {
     typeMapping.set(ps, position, actual)
@@ -73,6 +93,18 @@ case class BoundValue[+T](actual: T)(implicit typeMapping: TypeMapping[T]) exten
 
 object Bind {
   def apply[T](value: T)(implicit typeMapping: TypeMapping[T]) = BoundValue(value)(typeMapping)
+}
+
+case class FunctionCall[T](name: String, params: Expression, typeMapping: TypeMapping[T]) extends Value[T] {
+  val expression = "%1$s(%2$s)".format(name, params.expression)
+  
+  def extract(rs: ResultSet, position: Int) = typeMapping.get(rs, position)
+}
+
+case class FunctionSource(name: String) {
+  def call[T](params: Expression)(implicit typeMapping: TypeMapping[T]) = FunctionCall[T](name, params, typeMapping)
+  
+  def call[T](params: Value[T])(implicit typeMapping: TypeMapping[T]) = FunctionCall[T](name, params, typeMapping)
 }
 
 /**
@@ -130,11 +162,7 @@ case class Column[+T](name: String)(implicit relation: Relation, typeMapping: Ty
 
   def expression = "%1$s.%2$s".format(relation.aliasedName, name)
 
-  override def selectExpression = "%1$s AS %2$s".format(expression, asName)
-
-  def asName = expression.replace(".", "_")
-
-  def extract(rs: ResultSet) = typeMapping.get(rs, asName)
+  def extract(rs: ResultSet, position: Int) = typeMapping.get(rs, position)
 }
 
 /**
@@ -145,19 +173,24 @@ case class Projection[T](table: Table[T]) extends Value[T] {
 
   override def selectExpression = table.columns.map { column => column.selectExpression }.mkString(", ")
 
-  def extract(rs: ResultSet) = {
+  def extract(rs: ResultSet, position: Int) = {
     val constructor = table.rowType.erasure.getConstructors()(0)
     if (table.columns.length != constructor.getParameterTypes().length) {
       // TODO: see if we can make this a compile-time check
       throw new RuntimeException("The number of columns in table does not match the number of fields in %1$s.  Please check your class definitions".format(table.rowType.erasure.getName))
     }
-    // Get column values from ResultSet
-    val columnValues = table.columns.map { column => column.extract(rs) }
-
+    // Get column values
+    var columnsRead = 0
+    val columnValues = table.columns.map(column => {
+      val extract = column.extract(rs, position + columnsRead)
+      columnsRead += extract.columnsRead
+      extract.value
+    })
+    
     // Construct the row
     try {
       // Return the Extraction
-      constructor.newInstance(columnValues.map(_.asInstanceOf[Object]): _*).asInstanceOf[T]
+      Extraction(constructor.newInstance(columnValues.map(_.asInstanceOf[Object]): _*).asInstanceOf[T], columnsRead) 
     } catch {
       case e: Exception => throw new RuntimeException(
         "Unable to create row of type %1$s with values %2$s using constructor with argument types %3$s".format(
@@ -169,20 +202,10 @@ case class Projection[T](table: Table[T]) extends Value[T] {
   }
 }
 
-case class CompoundExpression2[T1 <: Expression, T2 <: Expression](override val _1: T1, override val _2: T2) extends Tuple2(_1, _2) with Expression {
-  def expression = "%1$s, %2$s".format(_1.expression, _2.expression)
-
-  override def selectExpression = "%1$s, %2$s".format(_1.selectExpression, _2.selectExpression)
-}
-
-case class CompoundExtractableExpression[T1, T2](override val _1: Extractable[T1], override val _2: Extractable[T2]) extends CompoundExpression2(_1, _2) with Extractable[Tuple2[T1, T2]] {
-  override def extract(rs: ResultSet) = (_1.extract(rs), _2.extract(rs))
-}
-
 /**
  * An expression that evaluates to a boolean like A = B, A <> B, A IS NULL, etc.
  */
-trait Condition extends Expression {
+trait Condition extends UnaryExpression {
   def &&(right: Condition) = CompoundCondition(this, "AND", right)
 
   def ||(right: Condition) = CompoundCondition(this, "OR", right)
@@ -217,6 +240,16 @@ case class NotNull(override val value: UnaryExpression) extends UnaryCondition(v
   val expression = "%1$s IS NOT NULL".format(value.expression)
 }
 
+class NOT(override val value: UnaryExpression) extends UnaryCondition(value) {
+  val expression = "NOT %1$s".format(value.expression)
+}
+
+object NOT {
+  def apply(value: UnaryExpression) = new NOT(value)
+  
+  def apply(value: Condition) = new NOT(value)
+}
+
 case class Comparison[T](override val left: UnaryExpression, comparison: String, override val right: UnaryExpression) extends BinaryCondition(left, comparison, right)
 
 case class CompoundCondition[T](override val left: Condition, composition: String, override val right: Condition) extends BinaryCondition(left, composition, right)
@@ -245,5 +278,5 @@ case class IncompleteJoin(left: FromItem, joinType: String, right: Relation) {
  * A from item representing a join.
  */
 case class Join(left: FromItem, joinType: String, right: Relation, on: Condition) extends FromItem {
-  def fromExpression = "%1$s %2$s %3$s ON %4$s".format(left.fromExpression, joinType, right.fromExpression, on)
+  def fromExpression = "%1$s %2$s %3$s ON %4$s".format(left.fromExpression, joinType, right.fromExpression, on.expression)
 }
