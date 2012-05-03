@@ -35,9 +35,9 @@ class FirstSpec extends FlatSpec with ShouldMatchers {
   Class.forName("org.postgresql.Driver");
   
   def findLineItemsForInvoice(invoiceId: Long) = (
-    SELECT DISTINCT(i.*, li.*, SQL.MAX(li.amount) AS "the_max", "MIN".call(li.amount))
+    SELECT DISTINCT(i.*, li.*, MAX(li.amount) AS "the_max", FN("MIN")(li.amount))
     FROM (i INNER_JOIN li ON i.id == li.invoice_id && i.id == li.invoice_id)
-    WHERE (i.id == Bind(invoiceId) && NOT(i.id <> Bind(5000)))
+    WHERE (i.id == ?(invoiceId) && NOT(i.id <> ?(5000)))
     ORDER_BY (i.id ASC, li.ts DESC)
     GROUP_BY (i.*, li.id, li.invoice_id, li.ts))
 
@@ -45,7 +45,7 @@ class FirstSpec extends FlatSpec with ShouldMatchers {
   val props = new java.util.Properties()
   props.setProperty("user", "sqins")
   props.setProperty("password", "sqins")
-  def conn = DriverManager.getConnection(url, props);
+  val conn = DriverManager.getConnection(url, props);
 
   var query = findLineItemsForInvoice(1)
   "The query" should "have the correct SQL expression" in {
@@ -57,12 +57,19 @@ GROUP BY i.id, i.description, li.id, li.invoice_id, li.ts
 ORDER BY i.id ASC, li.ts DESC""")
   }
   
+  "A single-table query" should "return an Iterable of the single row type" in {
+      (SELECT (i.*) FROM i)(conn).isInstanceOf[Iterable[Invoice]]
+  }
+  
   "The query" should "return a single row with the correct values" in {
     // Run the query
-    query(conn).foreach { row =>
+    val result: Iterable[(Invoice, LineItem, BigDecimal, BigDecimal)] = query(conn)
+    result.foreach { row =>
       {
+        row._1.isInstanceOf[Invoice] should be(true)
         row._1.id should equal(1)
         row._1.description should equal("An invoice")
+        row._2.isInstanceOf[LineItem] should be(true)
         row._2.id should equal(1)
         row._2.invoiceId should equal(1)
         row._2.amount should equal(56.78)

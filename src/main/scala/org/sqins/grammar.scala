@@ -33,7 +33,7 @@ case class Extraction[+T](value: T, columnsRead: Int)
 
 trait CompoundExtractable {
   var columnsRead = 0
-  
+
   def doExtract[T](extractable: Extractable[T], rs: ResultSet, position: Int) = {
     val extracted = extractable.extract(rs, position + columnsRead)
     columnsRead += extracted.columnsRead
@@ -44,16 +44,16 @@ trait CompoundExtractable {
 /**
  * A single-valued expression, such as a column, function call, scalar value, etc.
  */
-trait UnaryExpression extends Expression {
-  def ==(right: UnaryExpression) = Comparison(this, "=", right)
+trait ScalarExpression extends Expression {
+  def ==(right: ScalarExpression) = Comparison(this, "=", right)
 
-  def <>(right: UnaryExpression) = Comparison(this, "<>", right)
+  def <>(right: ScalarExpression) = Comparison(this, "<>", right)
 
-  def !=(right: UnaryExpression) = this.<>(right)
+  def !=(right: ScalarExpression) = this.<>(right)
 
-  def >(right: UnaryExpression) = Comparison(this, ">", right)
+  def >(right: ScalarExpression) = Comparison(this, ">", right)
 
-  def <(right: UnaryExpression) = Comparison(this, "<", right)
+  def <(right: ScalarExpression) = Comparison(this, "<", right)
 
   def IS_NULL = Null(this)
 
@@ -68,15 +68,15 @@ trait UnaryExpression extends Expression {
  * An expression that represents (or returns) a value.  Can be turned into a Condition using the operators
  * == <> != > < ISNULL ISNOTNULL
  */
-trait Value[+T] extends UnaryExpression with Extractable[T] {
+trait Value[+T] extends ScalarExpression with Extractable[T] {
   def AS(alias: String) = Alias[T, Value[T]](this, alias)
 }
 
 case class Alias[+T, +E <: Value[T]](aliased: E, alias: String) extends Extractable[T] {
   def expression = aliased.expression
-  
+
   override def selectExpression = "%1$s AS %2$s".format(aliased.expression, alias)
-  
+
   def extract(rs: ResultSet, position: Int) = aliased.extract(rs, position)
 }
 
@@ -91,20 +91,23 @@ case class BoundValue[+T](actual: T)(implicit typeMapping: TypeMapping[T]) exten
   }
 }
 
-object Bind {
+/**
+ * Bind a value
+ */
+object ? {
   def apply[T](value: T)(implicit typeMapping: TypeMapping[T]) = BoundValue(value)(typeMapping)
 }
 
 case class FunctionCall[T](name: String, params: Expression, typeMapping: TypeMapping[T]) extends Value[T] {
   val expression = "%1$s(%2$s)".format(name, params.expression)
-  
+
   def extract(rs: ResultSet, position: Int) = typeMapping.get(rs, position)
 }
 
-case class FunctionSource(name: String) {
-  def call[T](params: Expression)(implicit typeMapping: TypeMapping[T]) = FunctionCall[T](name, params, typeMapping)
-  
-  def call[T](params: Value[T])(implicit typeMapping: TypeMapping[T]) = FunctionCall[T](name, params, typeMapping)
+case class FN(name: String) {
+  def apply[T](params: Expression)(implicit typeMapping: TypeMapping[T]) = new FunctionCall(name, params, typeMapping)
+
+  def apply[T](params: Value[T])(implicit typeMapping: TypeMapping[T]) = new FunctionCall(name, params, typeMapping)
 }
 
 /**
@@ -186,11 +189,11 @@ case class Projection[T](table: Table[T]) extends Value[T] {
       columnsRead += extract.columnsRead
       extract.value
     })
-    
+
     // Construct the row
     try {
       // Return the Extraction
-      Extraction(constructor.newInstance(columnValues.map(_.asInstanceOf[Object]): _*).asInstanceOf[T], columnsRead) 
+      Extraction(constructor.newInstance(columnValues.map(_.asInstanceOf[Object]): _*).asInstanceOf[T], columnsRead)
     } catch {
       case e: Exception => throw new RuntimeException(
         "Unable to create row of type %1$s with values %2$s using constructor with argument types %3$s".format(
@@ -205,7 +208,7 @@ case class Projection[T](table: Table[T]) extends Value[T] {
 /**
  * An expression that evaluates to a boolean like A = B, A <> B, A IS NULL, etc.
  */
-trait Condition extends UnaryExpression {
+trait Condition extends ScalarExpression {
   def &&(right: Condition) = CompoundCondition(this, "AND", right)
 
   def ||(right: Condition) = CompoundCondition(this, "OR", right)
@@ -214,7 +217,7 @@ trait Condition extends UnaryExpression {
 /**
  * A condition based on a single expression.
  */
-abstract class UnaryCondition(val value: UnaryExpression) extends Condition {
+abstract class ScalarCondition(val value: ScalarExpression) extends Condition {
   override def bind(ps: PreparedStatement, position: Int) = value.bind(ps, position)
 }
 
@@ -232,32 +235,32 @@ abstract class BinaryCondition(val left: Expression, val operator: String, val r
   }
 }
 
-case class Null(override val value: UnaryExpression) extends UnaryCondition(value) {
+case class Null(override val value: ScalarExpression) extends ScalarCondition(value) {
   val expression = "%1$s IS NULL".format(value.expression)
 }
 
-case class NotNull(override val value: UnaryExpression) extends UnaryCondition(value) {
+case class NotNull(override val value: ScalarExpression) extends ScalarCondition(value) {
   val expression = "%1$s IS NOT NULL".format(value.expression)
 }
 
-class NOT(override val value: UnaryExpression) extends UnaryCondition(value) {
+class NOT(override val value: ScalarExpression) extends ScalarCondition(value) {
   val expression = "NOT %1$s".format(value.expression)
 }
 
 object NOT {
-  def apply(value: UnaryExpression) = new NOT(value)
-  
+  def apply(value: ScalarExpression) = new NOT(value)
+
   def apply(value: Condition) = new NOT(value)
 }
 
-case class Comparison[T](override val left: UnaryExpression, comparison: String, override val right: UnaryExpression) extends BinaryCondition(left, comparison, right)
+case class Comparison[T](override val left: ScalarExpression, comparison: String, override val right: ScalarExpression) extends BinaryCondition(left, comparison, right)
 
 case class CompoundCondition[T](override val left: Condition, composition: String, override val right: Condition) extends BinaryCondition(left, composition, right)
 
 /**
- * A sorted UnaryExpression.
+ * A sorted ScalarExpression.
  */
-case class SortedExpression(left: UnaryExpression, sort: String) extends Expression {
+case class SortedExpression(left: ScalarExpression, sort: String) extends Expression {
   def expression = "%1$s %2$s".format(left.expression, sort)
 }
 

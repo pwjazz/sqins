@@ -66,14 +66,12 @@ object Implicits {
     _set = (ps: PreparedStatement, position: Int, value: Timestamp) => ps.setTimestamp(position, value))
   implicit val OptionTimestampTypeMapping = new OptionTypeMapping(TimestampTypeMapping)
 
-  // Automatically convert values into bound values
-  implicit def value2BoundValue[T](value: T)(implicit typeMapping: TypeMapping[T]) = BoundValue[T](value)(typeMapping)
-
-  // Treat a String as a factory for function calls
-  implicit def string2FunctionSource(name: String) = FunctionSource(name)
-  
   // Allow Aliases to be treated as whatever was aliased
   implicit def alias2Aliased[T, E <: Value[T]](alias: Alias[T, E]) = alias.aliased
+  
+  // Built-in functions (aggregates, etc)
+  val AVG = FN("AVG")
+  val MAX = FN("MAX")
 
   // Automatically convert tuples of expressions into single Expressions
   implicit def tuple2ToExpression[T1 <: Expression, T2 <: Expression](tuple: Tuple2[T1, T2]) = CompoundExpression2(tuple._1, tuple._2)
