@@ -35,22 +35,36 @@ import java.sql.ResultSet
  * A generic SQL query that takes a text query and an optional seq of parameters.
  */
 case class SQL(query: String, params: Seq[BoundValue[_]] = Seq()) {
-  def executeUpdate(implicit conn: Connection) =
-    try {
-      buildStatement(conn).executeUpdate
-    } catch {
-      case e: Exception => throw new SQLError(this, e)
-    }
-
-  def executeQuery(implicit conn: Connection) =
-    try {
-      buildStatement(conn).executeQuery
-    } catch {
-      case e: Exception => throw new SQLError(this, e)
-    }
-
-  private def buildStatement(conn: Connection) = {
+  def executeUpdate(implicit conn: Connection) = {
     val ps = conn.prepareStatement(query)
+    try {
+      buildStatement(ps).executeUpdate
+      ps
+    } catch {
+      case e: Exception => throw new SQLError(this, e)
+    }
+  }
+
+  def executeInsert(implicit conn: Connection) = {
+    val ps = conn.prepareStatement(query, java.sql.Statement.RETURN_GENERATED_KEYS)
+    try {
+      buildStatement(ps).executeUpdate
+      ps
+    } catch {
+      case e: Exception => throw new SQLError(this, e)
+    }
+  }
+
+  def executeQuery(implicit conn: Connection) = {
+    val ps = conn.prepareStatement(query)
+    try {
+      buildStatement(ps).executeQuery
+    } catch {
+      case e: Exception => throw new SQLError(this, e)
+    }
+  }
+
+  private def buildStatement(ps: PreparedStatement) = {
     var position = 1
     params.foreach(param => {
       position += param.bind(ps, position)
@@ -66,19 +80,20 @@ class SQLError(sql: SQL, cause: Exception) extends RuntimeException("Error execu
   format(sql.query, sql.params.map(_.actual).mkString(","), cause.getMessage), cause)
 
 /**
- * An INSERT statement that does not yet have its VALUES.
+ * An INSERT statement that can be executed as a function.
  */
-case class IncompleteInsertStatement[T](into: IntoItem) {
-  def VALUES(values: Seq[BoundValue[_]]) = InsertValuesStatement(into, values)
-}
-
-/**
- * An INSERT statement that can be excuted as a function.
- */
-case class InsertValuesStatement[T](into: IntoItem, values: Seq[BoundValue[_]]) {
-  def apply(implicit conn: Connection) = {
+case class InsertValuesStatement[T, +K](into: IntoItem[T, K], values: Seq[BoundValue[_]]) {
+  def apply(implicit conn: Connection): Option[K] = {
     val expression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
-    SQL(expression, values).executeUpdate(conn)
+    val ps = SQL(expression, values).executeInsert(conn)
+    into.primaryKey.flatMap(extractor => {
+      val generatedKeys = ps.getGeneratedKeys
+      if (generatedKeys.next) {
+        Some(extractor.extract(generatedKeys, 1).value)
+      } else {
+        None
+      }
+    })
   }
 }
 
@@ -86,20 +101,20 @@ case class InsertValuesStatement[T](into: IntoItem, values: Seq[BoundValue[_]]) 
  * Syntax support for building InsertStatements using the INSERT keyword.
  */
 object INSERT {
-  def INTO[T](into: IntoItem) = IncompleteInsertStatement(into)
+  def INTO[T, K](into: IntoItem[T, K]) = into
 }
 
 /**
  * A SELECT statement missing its FROM clause.
  */
-case class IncompleteSelectStatement[T](select: Extractable[T], distinct: Boolean) {
+case class IncompleteSelectStatement[T](select: Extractable[T] with Expression, distinct: Boolean) {
   def FROM(from: FromItem) = SelectStatement(select, distinct, from)
 }
 
 /**
  * A SELECT statement that can be executed as a function.
  */
-case class SelectStatement[T](select: Extractable[T], distinct: Boolean, from: FromItem, where: Option[Condition] = None, orderBy: Option[Expression] = None, groupBy: Option[Expression] = None) {
+case class SelectStatement[T](select: Extractable[T] with Expression, distinct: Boolean, from: FromItem, where: Option[Condition] = None, orderBy: Option[Expression] = None, groupBy: Option[Expression] = None) {
   /**
    * Build the expression representing this query
    */
@@ -170,9 +185,9 @@ case class SelectStatement[T](select: Extractable[T], distinct: Boolean, from: F
  * Syntax support for building SelectStatements using the SELECT keyword.
  */
 object SELECT {
-  def apply[T](expression: Extractable[T]) = IncompleteSelectStatement(expression, false)
+  def apply[T](expression: Extractable[T] with Expression) = IncompleteSelectStatement(expression, false)
 
-  def DISTINCT[T](expression: Extractable[T]) = IncompleteSelectStatement(expression, true)
+  def DISTINCT[T](expression: Extractable[T] with Expression) = IncompleteSelectStatement(expression, true)
 }
 
 /**
