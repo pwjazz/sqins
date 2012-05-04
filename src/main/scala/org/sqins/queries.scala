@@ -31,6 +31,58 @@ import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
 
+/**
+ * A generic SQL query that takes a text query and an optional seq of parameters.
+ */
+case class SQL(query: String, params: Seq[BoundValue[_]] = Seq()) {
+  def executeUpdate(implicit conn: Connection) =
+    try {
+      buildStatement(conn).executeUpdate
+    } catch {
+      case e: Exception => throw new SQLFailure(this, e)
+    }
+
+  def executeQuery(implicit conn: Connection) =
+    try {
+      buildStatement(conn).executeQuery
+    } catch {
+      case e: Exception => throw new SQLFailure(this, e)
+    }
+
+  private def buildStatement(conn: Connection) = {
+    val ps = conn.prepareStatement(query)
+    var position = 1
+    params.foreach(param => {
+      position = param.bind(ps, position)
+    })
+    ps
+  }
+}
+
+class SQLFailure(sql: SQL, cause: Exception) extends RuntimeException("Error executing SQL \"%1$s\" with params (%2$s) failed: %3$s".
+  format(sql.query, sql.params.map(_.actual).mkString(","), cause.getMessage), cause)
+
+case class IncompleteInsertStatement[T](into: IntoItem) {
+  def VALUES(values: Seq[BoundValue[_]]) = InsertValuesStatement(into, values)
+}
+
+case class InsertValuesStatement[T](into: IntoItem, values: Seq[BoundValue[_]]) {
+  def apply(implicit conn: Connection) = {
+    val expression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
+    //    val ps = conn.prepareStatement("INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", ")))
+    //    var position = 1
+    //    values.foreach(value => {
+    //      position += value.bind(ps, position)
+    //    })
+    //    ps.executeUpdate
+    SQL(expression, values).executeUpdate(conn)
+  }
+}
+
+object INSERT {
+  def INTO[T](into: IntoItem) = IncompleteInsertStatement(into)
+}
+
 case class IncompleteSelectStatement[T](select: Extractable[T], distinct: Boolean) {
   def FROM(from: FromItem) = SelectStatement(select, distinct, from)
 }
@@ -41,7 +93,7 @@ case class SelectStatement[T](select: Extractable[T], distinct: Boolean, from: F
    */
   def expression = {
     var selectKeyword = distinct match {
-      case true => "SELECT DISTINCT"
+      case true  => "SELECT DISTINCT"
       case false => "SELECT"
     }
     var expression = "%1$s %2$s\nFROM %3$s".format(selectKeyword, select.selectExpression, from.fromExpression)
@@ -60,38 +112,34 @@ case class SelectStatement[T](select: Extractable[T], distinct: Boolean, from: F
       case Some(orderBy: Expression) => expression = "%1$s\nORDER BY %2$s".format(expression, orderBy.expression)
       case None                      => // ignore
     }
-    
+
     expression
   }
 
   def WHERE(where: Condition) = SelectStatement(select, distinct, from, Some(where), orderBy, groupBy)
-  
+
   def GROUP_BY(groupBy: Expression) = SelectStatement(select, distinct, from, where, orderBy, Some(groupBy))
 
   def ORDER_BY(orderBy: Expression) = SelectStatement(select, distinct, from, where, Some(orderBy), groupBy)
-  
+
   def apply(implicit conn: Connection) = {
-    val ps = conn.prepareStatement(expression)
-    var position = 1
-    position = select.bind(ps, position)
-    // TODO: handle sub-queries in bind
-    // position = from.bind(ps, position)
+    var boundValues = select.boundValues
     where match {
-      case Some(where: Condition) => position = where.bind(ps, position)
+      case Some(where: Condition) => boundValues ++= where.boundValues
       case None                   => // ignore
     }
 
     groupBy match {
-      case Some(groupBy: Expression) => position = groupBy.bind(ps, position)
-      case None                      => // ignore
-    }
-    
-    orderBy match {
-      case Some(orderBy: Expression) => position = orderBy.bind(ps, position)
+      case Some(groupBy: Expression) => boundValues ++= groupBy.boundValues
       case None                      => // ignore
     }
 
-    new SelectResult(ps.executeQuery, (rs: ResultSet) => select.extract(rs, 1).value)
+    orderBy match {
+      case Some(orderBy: Expression) => boundValues ++= orderBy.boundValues
+      case None                      => // ignore
+    }
+
+    new SelectResult(SQL(expression, boundValues).executeQuery, (rs: ResultSet) => select.extract(rs, 1).value)
   }
 
   override def toString = expression
@@ -99,7 +147,7 @@ case class SelectStatement[T](select: Extractable[T], distinct: Boolean, from: F
 
 object SELECT {
   def apply[T](expression: Extractable[T]) = IncompleteSelectStatement(expression, false)
-  
+
   def DISTINCT[T](expression: Extractable[T]) = IncompleteSelectStatement(expression, true)
 }
 
