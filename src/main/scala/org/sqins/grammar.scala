@@ -33,18 +33,19 @@ import java.sql.{ PreparedStatement, ResultSet }
  * Represents an expression such as a column, a scalar, a function call, or a list of these things
  */
 trait Expression {
+  /**
+   * The string representing this expression.
+   */
   def expression: String
 
+  /**
+   * The string representing this expression inside of a select clause.
+   */
   def selectExpression = expression
 
   /**
-   * Bind this expression at the given position on the given PreparedStatement, returning the position at which
-   * the next Expression should be bound.  The expression needs to know its own state for binding.
-   *
-   * The default implementation does nothing and returns the same position
+   * All the bound values associated with this expression.
    */
-  def bind(ps: PreparedStatement, position: Int) = position
-
   def boundValues = Seq[BoundValue[_]]()
 }
 
@@ -53,25 +54,19 @@ trait Expression {
  */
 trait Extractable[+T] extends Expression {
   /**
-   * Extract the value from the given ResultSet
+   * Extract the value from the given ResultSet.
    */
   def extract(rs: ResultSet, position: Int): Extraction[T]
 }
 
+/**
+ * The value extracted and the number of columns read in order to extract it.
+ */
 case class Extraction[+T](value: T, columnsRead: Int)
-
-trait CompoundExtractable {
-  var columnsRead = 0
-
-  def doExtract[T](extractable: Extractable[T], rs: ResultSet, position: Int) = {
-    val extracted = extractable.extract(rs, position + columnsRead)
-    columnsRead += extracted.columnsRead
-    extracted.value
-  }
-}
 
 /**
  * A single-valued expression, such as a column, function call, scalar value, etc.
+ * Provides methods for construction Conditions and SortedExpressions from the scalar expression.
  */
 trait ScalarExpression extends Expression {
   def ==(right: ScalarExpression) = Comparison(this, "=", right)
@@ -94,13 +89,15 @@ trait ScalarExpression extends Expression {
 }
 
 /**
- * An expression that represents (or returns) a value.  Can be turned into a Condition using the operators
- * == <> != > < ISNULL ISNOTNULL
+ * An expression that represents (or returns) a value.
  */
 trait Value[+T] extends ScalarExpression with Extractable[T] {
   def AS(alias: String) = Alias[T, Value[T]](this, alias)
 }
 
+/**
+ * An alias for Value.
+ */
 case class Alias[+T, +E <: Value[T]](aliased: E, alias: String) extends Extractable[T] {
   def expression = aliased.expression
 
@@ -109,32 +106,42 @@ case class Alias[+T, +E <: Value[T]](aliased: E, alias: String) extends Extracta
   def extract(rs: ResultSet, position: Int) = aliased.extract(rs, position)
 }
 
+/**
+ * A static value that can be bound into a query.
+ */
 case class BoundValue[+T](actual: T)(implicit typeMapping: TypeMapping[T]) extends Value[T] {
   val expression = "?"
 
   def extract(rs: ResultSet, position: Int) = Extraction(actual, 0)
 
-  override def bind(ps: PreparedStatement, position: Int) = {
+  def bind(ps: PreparedStatement, position: Int) = {
     typeMapping.set(ps, position, actual)
-    position + 1
+    1
   }
 
   override def boundValues = Seq(this)
 }
 
 /**
- * Bind a value
+ * Bind a value.  Only values of a type with an in-scope implicit TypeMapping can be bound. 
  */
 object ? {
   def apply[T](value: T)(implicit typeMapping: TypeMapping[T]) = BoundValue(value)(typeMapping)
 }
 
+/**
+ * A call to a database function.  The function can take one or more parameters as captured by the params Expression.
+ * Only function calls returning a type of value with an in-scope implicit TypeMapping can be made. 
+ */
 case class FunctionCall[T](name: String, params: Expression, typeMapping: TypeMapping[T]) extends Value[T] {
   val expression = "%1$s(%2$s)".format(name, params.expression)
 
   def extract(rs: ResultSet, position: Int) = typeMapping.get(rs, position)
 }
 
+/**
+ * Constructs FunctionCalls from expressions and scalar values.
+ */
 case class FN(name: String) {
   def apply[T](params: Expression)(implicit typeMapping: TypeMapping[T]) = new FunctionCall(name, params, typeMapping)
 
@@ -142,11 +149,47 @@ case class FN(name: String) {
 }
 
 /**
+ * Something that can be used as the INTO clause of an INSERT statement.
+ */
+trait IntoItem {
+  def intoExpression: String
+}
+
+/**
+ * An item from which one can select, such as a table, list of tables, joined tables.
+ */
+trait FromItem {
+  def fromExpression: String
+
+  def INNER_JOIN(right: Relation) = IncompleteJoin(this, "INNER JOIN", right)
+}
+
+/**
+ * A Join that is missing the join condition
+ */
+case class IncompleteJoin(left: FromItem, joinType: String, right: Relation) {
+  def ON(on: Condition) = Join(left, joinType, right, on)
+}
+
+/**
+ * A from item representing a join.
+ */
+case class Join(left: FromItem, joinType: String, right: Relation, on: Condition) extends FromItem {
+  def fromExpression = "%1$s %2$s %3$s ON %4$s".format(left.fromExpression, joinType, right.fromExpression, on.expression)
+}
+
+/**
  * A named list of columns (table, alias, etc.)
  */
 abstract class Relation(val name: String) extends FromItem {
+  /**
+   * An optional alias for this Relation.
+   */
   var alias: Option[String] = None
 
+  /**
+   * All of the columns in this relation.
+   */
   var columns = Seq[ColumnDef[Any, this.type]]()
 
   /**
@@ -171,7 +214,10 @@ abstract class Table[T: Manifest](override val name: String) extends Relation(na
 
   implicit def relation = this
 
-  def Column[T](name: String, isAutoGenerated: Boolean = false)(implicit typeMapping: TypeMapping[T]) = ColumnDef[T, this.type](name)(this, typeMapping)
+  /**
+   * Define a column on this Table.  Only columns of a type with an in-scope implicit TypeMapping can be created.
+   */
+  def Column[T](name: String)(implicit typeMapping: TypeMapping[T]) = ColumnDef[T, this.type](name)(this, typeMapping)
 
   /**
    * Alias this table.  Aliasing just creates another table of the same type but with a different name.
@@ -197,14 +243,20 @@ abstract class Table[T: Manifest](override val name: String) extends Relation(na
 
   def intoExpression = "%1$s (%2$s)".format(name, nonAutoGeneratedColumns.map(_.name).mkString(", "))
 
+  /**
+   * Bind the entire row (typically used for the VALUES() clause of an INSERT statement).
+   */
   def ?(row: T) = nonAutoGeneratedColumns.map(_.boundValueFrom(row))
 
-  def apply(columns: List[ColumnDef[_, this.type]]) = IntoWithSpecificColumns(this, columns)
+  def apply(columns: Seq[ColumnDef[_, this.type]]) = IntoWithSpecificColumns(this, columns)
 
   def * = Projection(this)
 }
 
-case class IntoWithSpecificColumns(table: Table[_], columns: List[ColumnDef[_, _]]) extends IntoItem {
+/**
+ * An into clause with a restricted list of columns.
+ */
+case class IntoWithSpecificColumns(table: Table[_], columns: Seq[ColumnDef[_, _]]) extends IntoItem {
   def intoExpression = "%1$s (%2$s)".format(table.name, columns.map(_.name).mkString(","))
 }
 
@@ -212,14 +264,23 @@ case class IntoWithSpecificColumns(table: Table[_], columns: List[ColumnDef[_, _
  * A column in a Relation.
  */
 case class ColumnDef[+T, R <: Relation](name: String, isAutoGenerated: Boolean = false)(implicit relation: R, typeMapping: TypeMapping[T]) extends Value[T] {
+  /**
+   * Alias this column to the given Relation.
+   */
   def aliasedTo(alias: R) = ColumnDef[T, R](name)(alias, typeMapping)
 
   def expression = "%1$s.%2$s".format(relation.aliasedName, name)
 
   def extract(rs: ResultSet, position: Int) = typeMapping.get(rs, position)
 
+  /**
+   * Mark this column as being auto-generated by the database so that full-row insert statements will omit this column.   
+   */
   def autoGenerated = ColumnDef(name, true)(relation, typeMapping)
 
+  /**
+   * Obtain a BoundValue from this column in the given row
+   */
   def boundValueFrom(row: Any) = BoundValue(row.getClass.getMethod(name).invoke(row).asInstanceOf[T])(typeMapping)
 }
 
@@ -273,8 +334,6 @@ trait Condition extends ScalarExpression {
  * A condition based on a single expression.
  */
 abstract class ScalarCondition(val value: ScalarExpression) extends Condition {
-  override def bind(ps: PreparedStatement, position: Int) = value.bind(ps, position)
-
   override def boundValues = value.boundValues
 }
 
@@ -283,13 +342,6 @@ abstract class ScalarCondition(val value: ScalarExpression) extends Condition {
  */
 abstract class BinaryCondition(val left: Expression, val operator: String, val right: Expression) extends Condition {
   val expression = "%1$s %2$s %3$s".format(left.expression, operator, right.expression)
-
-  override def bind(ps: PreparedStatement, position: Int) = {
-    var currentPosition = position
-    currentPosition = left.bind(ps, currentPosition)
-    currentPosition = right.bind(ps, currentPosition)
-    currentPosition
-  }
 
   override def boundValues = left.boundValues ++ right.boundValues
 }
@@ -302,6 +354,9 @@ case class NotNull(override val value: ScalarExpression) extends ScalarCondition
   val expression = "%1$s IS NOT NULL".format(value.expression)
 }
 
+/**
+ * Logically negates a given scalar expression.
+ */
 class NOT(override val value: ScalarExpression) extends ScalarCondition(value) {
   val expression = "NOT %1$s".format(value.expression)
 }
@@ -321,28 +376,4 @@ case class CompoundCondition[T](override val left: Condition, composition: Strin
  */
 case class SortedExpression(left: ScalarExpression, sort: String) extends Expression {
   def expression = "%1$s %2$s".format(left.expression, sort)
-}
-
-trait IntoItem {
-  def intoExpression: String
-}
-
-/**
- * An item from which one can select, such as a table, list of tables, joined tables.
- */
-trait FromItem {
-  def fromExpression: String
-
-  def INNER_JOIN(right: Relation) = IncompleteJoin(this, "INNER JOIN", right)
-}
-
-case class IncompleteJoin(left: FromItem, joinType: String, right: Relation) {
-  def ON(on: Condition) = Join(left, joinType, right, on)
-}
-
-/**
- * A from item representing a join.
- */
-case class Join(left: FromItem, joinType: String, right: Relation, on: Condition) extends FromItem {
-  def fromExpression = "%1$s %2$s %3$s ON %4$s".format(left.fromExpression, joinType, right.fromExpression, on.expression)
 }

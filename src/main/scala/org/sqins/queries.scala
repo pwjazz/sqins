@@ -39,54 +39,66 @@ case class SQL(query: String, params: Seq[BoundValue[_]] = Seq()) {
     try {
       buildStatement(conn).executeUpdate
     } catch {
-      case e: Exception => throw new SQLFailure(this, e)
+      case e: Exception => throw new SQLError(this, e)
     }
 
   def executeQuery(implicit conn: Connection) =
     try {
       buildStatement(conn).executeQuery
     } catch {
-      case e: Exception => throw new SQLFailure(this, e)
+      case e: Exception => throw new SQLError(this, e)
     }
 
   private def buildStatement(conn: Connection) = {
     val ps = conn.prepareStatement(query)
     var position = 1
     params.foreach(param => {
-      position = param.bind(ps, position)
+      position += param.bind(ps, position)
     })
     ps
   }
 }
 
-class SQLFailure(sql: SQL, cause: Exception) extends RuntimeException("Error executing SQL \"%1$s\" with params (%2$s) failed: %3$s".
+/**
+ * An error that occurred while processing SQL.
+ */
+class SQLError(sql: SQL, cause: Exception) extends RuntimeException("Error executing SQL \"%1$s\" with params (%2$s) failed: %3$s".
   format(sql.query, sql.params.map(_.actual).mkString(","), cause.getMessage), cause)
 
+/**
+ * An INSERT statement that does not yet have its VALUES.
+ */
 case class IncompleteInsertStatement[T](into: IntoItem) {
   def VALUES(values: Seq[BoundValue[_]]) = InsertValuesStatement(into, values)
 }
 
+/**
+ * An INSERT statement that can be excuted as a function.
+ */
 case class InsertValuesStatement[T](into: IntoItem, values: Seq[BoundValue[_]]) {
   def apply(implicit conn: Connection) = {
     val expression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
-    //    val ps = conn.prepareStatement("INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", ")))
-    //    var position = 1
-    //    values.foreach(value => {
-    //      position += value.bind(ps, position)
-    //    })
-    //    ps.executeUpdate
     SQL(expression, values).executeUpdate(conn)
   }
 }
 
+/**
+ * Syntax support for building InsertStatements using the INSERT keyword.
+ */
 object INSERT {
   def INTO[T](into: IntoItem) = IncompleteInsertStatement(into)
 }
 
+/**
+ * A SELECT statement missing its FROM clause.
+ */
 case class IncompleteSelectStatement[T](select: Extractable[T], distinct: Boolean) {
   def FROM(from: FromItem) = SelectStatement(select, distinct, from)
 }
 
+/**
+ * A SELECT statement that can be executed as a function.
+ */
 case class SelectStatement[T](select: Extractable[T], distinct: Boolean, from: FromItem, where: Option[Condition] = None, orderBy: Option[Expression] = None, groupBy: Option[Expression] = None) {
   /**
    * Build the expression representing this query
@@ -116,10 +128,19 @@ case class SelectStatement[T](select: Extractable[T], distinct: Boolean, from: F
     expression
   }
 
+  /**
+   * Add a WHERE clause.
+   */
   def WHERE(where: Condition) = SelectStatement(select, distinct, from, Some(where), orderBy, groupBy)
 
+  /**
+   * Add a GROUP BY clause.
+   */
   def GROUP_BY(groupBy: Expression) = SelectStatement(select, distinct, from, where, orderBy, Some(groupBy))
 
+  /**
+   * Add an ORDER BY clause.
+   */
   def ORDER_BY(orderBy: Expression) = SelectStatement(select, distinct, from, where, Some(orderBy), groupBy)
 
   def apply(implicit conn: Connection) = {
@@ -145,17 +166,23 @@ case class SelectStatement[T](select: Extractable[T], distinct: Boolean, from: F
   override def toString = expression
 }
 
+/**
+ * Syntax support for building SelectStatements using the SELECT keyword.
+ */
 object SELECT {
   def apply[T](expression: Extractable[T]) = IncompleteSelectStatement(expression, false)
 
   def DISTINCT[T](expression: Extractable[T]) = IncompleteSelectStatement(expression, true)
 }
 
+/**
+ * The result of executing a SELECT statement.
+ */
 class SelectResult[T](rs: ResultSet, rowReader: (ResultSet => T)) extends Iterable[T] {
   def iterator = new SelectResultIterator(rs, rowReader)
 }
 
-class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => T)) extends Iterator[T] {
+protected class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => T)) extends Iterator[T] {
   private var needsRead = true
 
   def hasNext = {

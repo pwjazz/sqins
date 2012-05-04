@@ -89,6 +89,20 @@ class FirstSpec extends FlatSpec with ShouldMatchers {
         """).executeUpdate(conn)
   }
 
+  "A SQL query" should "provide useful error reporting" in {
+    // ?(5) binds the value 5 into the query
+    val query = SQL("INVALID_SQL ?", ?(5))
+
+    try {
+      query.executeQuery(conn)
+    } catch {
+      case e: Exception => {
+        e.getClass() should equal(classOf[SQLError])
+        e.getMessage.indexOf("""Error executing SQL "INVALID_SQL ?" with params (5) failed: ERROR: syntax error at or near "INVALID_SQL"""") should equal(0)
+      }
+    }
+  }
+
   "The INSERT function" should "be able to construct an insert query using full table names and specific columns" in {
     // Define some query builder methods
     def insertInvoice(invoice: Invoice) = (
@@ -111,52 +125,155 @@ class FirstSpec extends FlatSpec with ShouldMatchers {
     insertLineItem(lineItem)
   }
 
-  var simpleSelectQuery:SelectStatement[Invoice] = null
-  "A simple select statement" should "be constructable using projections" in {
-     simpleSelectQuery = SELECT(Invoice.*) FROM (Invoice)
+  var simpleSelectQuery: SelectStatement[Invoice] = null
+  "A simple SELECT statement" should "be constructable using projections" in {
+    simpleSelectQuery = SELECT(Invoice.*) FROM (Invoice)
   }
-  
-  var simpleSelectResult:SelectResult[Invoice] = null
+
+  var simpleSelectResult: SelectResult[Invoice] = null
   it should "act as a function that takes a connection and returns a typed SelectResult" in {
     simpleSelectResult = simpleSelectQuery(conn)
   }
-  
+
   "A SelectResult" should "allow iteration over the rows" in {
     simpleSelectResult.foreach(row => {
       row.id should equal(1)
       row.description should equal("An invoice")
     })
   }
-  
+
   it should "include the correct number of rows" in {
     simpleSelectResult.toList.length should equal(1)
   }
 
+  // Permanently alias the tables
   val i = Invoice AS "i"
   val li = LineItem AS "li"
-  
-  def findLineItemsForInvoice(invoiceId: Long) = (
-    SELECT DISTINCT (i.*, li.*, MAX(li.amount) AS "the_max", FN("MIN")(li.amount), ?(5))
-    FROM (i INNER_JOIN li ON i.id == li.invoice_id && i.id == li.invoice_id)
-    WHERE (i.id == ?(invoiceId) && NOT(i.id <> ?(5000)))
-    ORDER_BY (i.id ASC, li.ts DESC)
-    GROUP_BY (i.*, li.id, li.invoice_id, li.ts))
 
-  var query = findLineItemsForInvoice(1)
-  "The query" should "have the correct SQL expression" in {
+  "A SELECT statement" should "be able to return scalar values" in {
+    val query: SelectStatement[Long] = SELECT(i.id) FROM (i)
+
+    query.expression should equal("""SELECT i.id
+FROM invoice AS i""")
+  }
+
+  it should "be writeable on multiple lines by wrapping in parentheses" in {
+    val query: SelectStatement[Long] = (
+      SELECT(i.id)
+      FROM (i))
+
+    query.expression should equal("""SELECT i.id
+FROM invoice AS i""")
+  }
+
+  it should "be able to contain bound scalar values in the select clause" in {
+    val query: SelectStatement[Int] = SELECT(?(5)) FROM (i)
+
+    query.expression should equal("""SELECT ?
+FROM invoice AS i""")
+  }
+
+  it should "be able to select individual fields into tuples" in {
+    val query: SelectStatement[Tuple2[Long, String]] = SELECT(i.id, i.description) FROM (i)
+  }
+
+  it should "be able to contain joins" in {
+    val query: SelectStatement[Tuple2[Invoice, LineItem]] = (
+      SELECT(i.*, li.*)
+      FROM (i INNER_JOIN li ON i.id == li.invoice_id))
+
+    query.expression should equal("""SELECT i.id, i.description, li.id, li.invoice_id, li.amount, li.ts
+FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""")
+  }
+
+  it should "be able to contain joins with multiple conditions and negations" in {
+    val query: SelectStatement[Tuple2[Invoice, LineItem]] = (
+      SELECT(i.*, li.*)
+      FROM (i INNER_JOIN li ON i.id == li.invoice_id && NOT(i.id <> ?(5000))))
+
+    query.expression should equal("""SELECT i.id, i.description, li.id, li.invoice_id, li.amount, li.ts
+FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id AND NOT i.id <> ?""")
+  }
+
+  it should "be able to contain projections along with individual columns" in {
+    val query: SelectStatement[Tuple2[Invoice, BigDecimal]] = (
+      SELECT(i.*, li.amount)
+      FROM (i INNER_JOIN li ON i.id == li.invoice_id))
+
+    query.expression should equal("""SELECT i.id, i.description, li.amount
+FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""")
+  }
+
+  it should "be able to support distinct queries" in {
+    val query: SelectStatement[Tuple2[Invoice, BigDecimal]] = (
+      SELECT DISTINCT (i.*, li.amount)
+      FROM (i INNER_JOIN li ON i.id == li.invoice_id))
+
+    query.expression should equal("""SELECT DISTINCT i.id, i.description, li.amount
+FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""")
+  }
+
+  it should "support where conditions" in {
+    val query = (
+      SELECT DISTINCT (i.*, li.amount)
+      FROM (i INNER_JOIN li ON i.id == li.invoice_id)
+      WHERE (i.id == ?(1)))
+
+    query.expression should equal("""SELECT DISTINCT i.id, i.description, li.amount
+FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
+WHERE i.id = ?""")
+  }
+
+  it should "be buildable in a functional style" in {
+    def buildQuery(invoiceId: Long) = (
+      SELECT DISTINCT (i.*, li.amount)
+      FROM (i INNER_JOIN li ON i.id == li.invoice_id)
+      WHERE (i.id == ?(invoiceId)))
+
+    buildQuery(1).expression should equal("""SELECT DISTINCT i.id, i.description, li.amount
+FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
+WHERE i.id = ?""")
+  }
+  
+  it should "support ordering in default, ascending and descending order" in {
+    val query = (
+      SELECT DISTINCT (i.*, li.amount)
+      FROM (i INNER_JOIN li ON i.id == li.invoice_id)
+      ORDER_BY (i.id, i.id ASC, li.amount DESC))
+
+    query.expression should equal("""SELECT DISTINCT i.id, i.description, li.amount
+FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
+ORDER BY i.id, i.id ASC, li.amount DESC""")
+  }
+
+  it should "support aggregations" in {
+    val query: SelectStatement[Tuple2[Long, BigDecimal]] = (
+      SELECT(i.id, MAX(li.amount))
+      FROM (i INNER_JOIN li ON i.id == li.invoice_id)
+      GROUP_BY (i.id))
+
+    query.expression should equal("""SELECT i.id, MAX(li.amount)
+FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
+GROUP BY i.id""")
+  }
+
+  "A SELECT query" should "allows us to put together aggregations, wheres and all this other stuff and work correctly" in {
+    def findLineItemsForInvoice(invoiceId: Long) = (
+      SELECT DISTINCT (i.*, li.*, MAX(li.amount) AS "the_max", FN("MIN")(li.amount), ?(5))
+      FROM (i INNER_JOIN li ON i.id == li.invoice_id && i.id == li.invoice_id)
+      WHERE (i.id == ?(invoiceId) && NOT(i.id <> ?(5000)))
+      ORDER_BY (i.id ASC, li.ts DESC)
+      GROUP_BY (i.*, li.id, li.invoice_id, li.ts))
+
+    val query = findLineItemsForInvoice(1)
+
     query.expression should equal(
       """SELECT DISTINCT i.id, i.description, li.id, li.invoice_id, li.amount, li.ts, MAX(li.amount) AS the_max, MIN(li.amount), ?
 FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id AND i.id = li.invoice_id
 WHERE i.id = ? AND NOT i.id <> ?
 GROUP BY i.id, i.description, li.id, li.invoice_id, li.ts
 ORDER BY i.id ASC, li.ts DESC""")
-  }
 
-  "A single-table query" should "return an Iterable of the single row type" in {
-    (SELECT(i.*) FROM i)(conn).isInstanceOf[Iterable[Invoice]]
-  }
-
-  "The query" should "return a single row with the correct values" in {
     // Run the query
     val result: Iterable[(Invoice, LineItem, BigDecimal, BigDecimal, Int)] = query(conn)
     result.foreach { row =>
@@ -173,5 +290,29 @@ ORDER BY i.id ASC, li.ts DESC""")
         row._5 should equal(5)
       }
     }
+  }
+
+  case class MyType(wrapped: String)
+
+  "Type mappings" should "be extensible" in {
+    // The next line won't compile yet and will complain about not finding an implicit value for parameter typeMapping
+    // val boundValue = ?(MyType("coolness"))
+
+    // Let's define our own type mapping for MyType
+    object MyTypeMappings {
+      implicit val MyTypeMapping = new TypeMapping[MyType](
+        _get = (rs: ResultSet, position: Int) => Extraction(MyType(rs.getString(position)), 1),
+        _set = (ps: PreparedStatement, position: Int, value: MyType) => ps.setString(position, value.wrapped))
+
+      // Option types require their own type mapping, so let's define that as well
+      implicit val OptionMyTypeMapping = new OptionTypeMapping(MyTypeMapping)
+    }
+
+    import MyTypeMappings._
+
+    // After defining our implicit type mapping and bringing it into scope, these lines do compile 
+    val boundValue = ?(MyType("coolness"))
+    val optionValue: Option[MyType] = None
+    val boundOptionValue = ?(optionValue)
   }
 }

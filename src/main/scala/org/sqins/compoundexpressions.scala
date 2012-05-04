@@ -25,14 +25,28 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
 */
 
+package org.sqins
+
+import java.sql.ResultSet
+
 /*
  * This file defines compound expression and compound extractable expressions based on tuples.
  * These are auto-generated from this
  * <a href="https://docs.google.com/spreadsheet/ccc?key=0AthXvKF2QyamdEFVdDFGMzBVYmxGempheEpHOU9WZkE#gid=0">google spreadsheet</a>. 
  */
-package org.sqins
 
-import java.sql.ResultSet
+/**
+ * Provides functionality common to all CompoundExtractables.
+ */
+trait CompoundExtractable {
+  var columnsRead = 0
+
+  def doExtract[T](extractable: Extractable[T], rs: ResultSet, position: Int) = {
+    val extracted = extractable.extract(rs, position + columnsRead)
+    columnsRead += extracted.columnsRead
+    extracted.value
+  }
+}
 
 case class CompoundExpression2[T1 <: Expression, T2 <: Expression](override val _1: T1, override val _2: T2) extends Tuple2(_1, _2) with Expression {
   override def expression = "%1$s, %2$s".format(_1.expression, _2.expression)

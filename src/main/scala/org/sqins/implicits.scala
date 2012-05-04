@@ -33,8 +33,8 @@ import java.sql.Date
 import java.sql.Timestamp
 
 /**
- * Pre-defined implicit type mappings.  Users will import these as TypeMappings._ in order to define their Tables and
- *  Fields.
+ * Pre-defined implicit type mappings and other implicit conversions.  sqins requires that these be brought into scope
+ * in order to build table definitions and queries.
  */
 object Implicits {
   // Type mappings
