@@ -39,7 +39,6 @@ case class SQL(query: String, params: Seq[BoundValue[_]] = Seq()) {
     val ps = conn.prepareStatement(query)
     try {
       buildStatement(ps).executeUpdate
-      ps
     } catch {
       case e: Exception => throw new SQLError(this, e)
     }
@@ -83,8 +82,9 @@ class SQLError(sql: SQL, cause: Exception) extends RuntimeException("Error execu
  * An INSERT statement that can be executed as a function.
  */
 case class InsertValuesStatement[T, +K](into: IntoItem[T, K], values: Seq[BoundValue[_]]) {
+  def expression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
+
   def apply(implicit conn: Connection): Option[K] = {
-    val expression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
     val ps = SQL(expression, values).executeInsert(conn)
     into.primaryKey.flatMap(extractor => {
       val generatedKeys = ps.getGeneratedKeys
@@ -102,6 +102,58 @@ case class InsertValuesStatement[T, +K](into: IntoItem[T, K], values: Seq[BoundV
  */
 object INSERT {
   def INTO[T, K](into: IntoItem[T, K]) = into
+}
+
+case class IncompleteUpdateStatement[T](table: Table[T, _]) {
+  def SET(set: Expression) = UpdateStatement(table, set)
+}
+
+case class UpdateStatement[T](table: Table[T, _], set: Expression, where: Option[Condition] = None) {
+  def WHERE(where: Condition) = UpdateStatement(table, set, Some(where))
+
+  def baseExpression = "UPDATE %1$s\nSET %2$s".format(table.fromExpression, set.expression)
+
+  def expression = where match {
+    case Some(where: Condition) => "%1$s\nWHERE %2$s".format(baseExpression, where.expression)
+    case None                   => baseExpression
+  }
+
+  def apply(conn: Connection) = {
+    var boundValues = where match {
+      case Some(where: Condition) => set.boundValues ++ where.boundValues
+      case None                   => set.boundValues
+    }
+
+    SQL(expression, boundValues).executeUpdate(conn)
+  }
+}
+
+object UPDATE {
+  def apply[T](table: Table[T, _]) = IncompleteUpdateStatement(table)
+}
+
+case class DeleteStatement[T](table: Table[T, _], where: Option[Condition] = None) {
+  def WHERE(where: Condition) = DeleteStatement(table, Some(where))
+
+  def baseExpression = "DELETE FROM %1$s".format(table.fromExpression)
+
+  def expression = where match {
+    case Some(where: Condition) => "%1$s\nWHERE %2$s".format(baseExpression, where)
+    case None                   => baseExpression
+  }
+
+  def apply(conn: Connection) = {
+    var boundValues = where match {
+      case Some(where: Condition) => where.boundValues
+      case None                   => Seq()
+    }
+
+    SQL(expression, boundValues).executeUpdate(conn)
+  }
+}
+
+object DELETE {
+  def FROM[T](table: Table[T, _]) = DeleteStatement(table)
 }
 
 /**
