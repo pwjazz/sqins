@@ -267,6 +267,8 @@ abstract class Table[T: Manifest, K](override val name: String) extends Relation
   
   def apply(columns: Seq[ColumnDef[_, this.type]]) = IntoWithSpecificColumns(this, columns)
   
+  def apply(column: ColumnDef[_, this.type]) = IntoWithSpecificColumns(this, Seq(column))
+  
   def * = Projection(this)
 }
 
