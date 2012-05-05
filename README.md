@@ -53,11 +53,11 @@ class LineItemTable extends Table[LineItem, Long]("line_item") {
 
   primaryKey(id)
   columns(id, invoice_id, amount, ts)
-} // Set up names for our tables
+}
+
+// Set up names for our tables
 val invoice = new InvoiceTable()
 val line_item = new LineItemTable()
-
-initSchema()
 
 // Set up a connection
 val conn: Connection = getConnection // get your connection from wherever you like
