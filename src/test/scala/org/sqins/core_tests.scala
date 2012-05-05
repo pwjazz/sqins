@@ -71,9 +71,9 @@ class FirstSpec extends FlatSpec with ShouldMatchers {
   val props = new java.util.Properties()
   props.setProperty("user", "sqins")
   props.setProperty("password", "sqins")
-  
-  def conn = DriverManager.getConnection(url, props); 
-  
+
+  def conn = DriverManager.getConnection(url, props);
+
   "The SQL function" should "construct a generic SQL query that is usable for DML and other stuff not supported natively by sqins" in {
     SQL("""
         DROP TABLE IF EXISTS line_item;
@@ -216,13 +216,13 @@ FROM invoice AS i""")
 
     query.expression should equal("""SELECT i.id, i.description, li.id, li.invoice_id, li.amount, li.ts
 FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""")
-    
+
     query(conn).foreach(row => {
       row._1.id should equal(1)
       row._1.description should equal("An invoice")
       row._2.id should equal(1)
       row._2.invoice_id should equal(1)
-      row._2.amount should equal (56.78)      
+      row._2.amount should equal(56.78)
     })
   }
 
@@ -330,6 +330,23 @@ ORDER BY i.id ASC, li.ts DESC""")
         row._5 should equal(5)
       }
     }
+  }
+
+  "A DELETE query" should "support a WHERE clause" in {
+    val query = DELETE FROM LineItem WHERE LineItem.id == ?(-50)
+
+    query.expression should equal("""DELETE FROM line_item
+  WHERE line_item.id = ?""")
+
+    query(conn)
+  }
+
+  it should "return the number of deleted rows" in {
+    val query = DELETE FROM LineItem
+
+    query.expression should equal("DELETE FROM line_item")
+
+    query(conn) should equal(1)
   }
 
   case class MyType(wrapped: String)

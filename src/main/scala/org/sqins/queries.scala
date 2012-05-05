@@ -138,7 +138,7 @@ case class DeleteStatement[T](table: Table[T, _], where: Option[Condition] = Non
   def baseExpression = "DELETE FROM %1$s".format(table.fromExpression)
 
   def expression = where match {
-    case Some(where: Condition) => "%1$s\nWHERE %2$s".format(baseExpression, where)
+    case Some(where: Condition) => "%1$s\nWHERE %2$s".format(baseExpression, where.expression)
     case None                   => baseExpression
   }
 
