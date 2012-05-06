@@ -12,13 +12,13 @@ really easy and stays out of the way for the other 20%.
 
 ### Benefits
 
- * Syntax very similar to SQL - if you know SQL, you know sqins
+ * Looks like SQL - if you know SQL, you pretty much know sqins.
  * Strongly typed - compile time checking for SQL syntax and column types
  * Not an ORM - sqins is just a SQL API
  * Simple mapping - unlike an ORM, sqins just needs to know the most basic things about your tables and columns
  * Extensible scalar types - sqins comes with support for basic types like numbers, strings and dates and makes it super-easy to define new type mappings
- * Stateless - sqins doesn't cache data, maintain identity or relationships or do any other ORM funkiness
- * Smart performance - sqnis employs common-sense optimizations like using PreparedStatements, streaming results from cursors, etc.
+ * No mutable state - sqins doesn't cache data, maintain identity or relationships or do any other ORM funkiness.  This makes it easier to use, and makes it usable in idiomatic Scala. 
+ * Smart performance - sqins employs common-sense optimizations like using PreparedStatements, streaming results from cursors, etc.
  * Works with PostgreSQL - other databases on the way
 
 ### A quick example
@@ -28,7 +28,7 @@ import java.sql._
 import org.sqins._
 import org.sqins.Implicits._
 
-// Define our Scala model
+// Define our Scala model (needs to be case classes)
 case class Invoice(id: Long = -1,
                    description: String)
 
@@ -176,6 +176,7 @@ SELECT [ DISTINCT ] ]
 * All queries
     * Support for correlated subquery in expressions
     * Support for correlated subquery in conditions 
+    * Support for mapping to non-case classes???
 * INSERT queries
     * Support for using a SELECT query in lieu of the VALUES clause
     * Support for DEFAULT column values in the VALUES clause    
