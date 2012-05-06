@@ -22,6 +22,10 @@ really easy and stays out of the way for the other 20%.
 ### A quick example
 
 ````scala
+import java.sql._
+import org.sqins._
+import org.sqins.Implicits._
+
 // Define our Scala model
 case class Invoice(id: Long = -1,
                    description: String)
@@ -60,7 +64,7 @@ val invoice = new InvoiceTable()
 val line_item = new LineItemTable()
 
 // Set up a connection
-val conn: Connection = getConnection // get your connection from wherever you like
+implicit val conn: Connection = getConnection // get your connection from wherever you like
 
 // We can set up queries inline
 val query = INSERT INTO invoice VALUES (Invoice(description = "An invoice"))
@@ -74,8 +78,9 @@ query(conn) match {
   case None => // ignore
 }
 
+// Since conn is implicit, we'll stop using it since it's actually not needed explicitly
 // Let's update the amount on all of our line items
-(UPDATE(line_item) SET (line_item.amount := ?(50)))(conn)
+UPDATE(line_item) SET (line_item.amount := ?(50)) go
 
 // Let's query for invoices with line items, and let's use aliases while we're at it
 val i = invoice AS "i"
@@ -86,7 +91,7 @@ val selectQuery = (
   FROM (i INNER_JOIN li ON i.id == li.invoice_id)
   ORDER_BY (i.id, li.ts DESC))
 
-val selectResult = selectQuery(conn)
+val selectResult = selectQuery go
 
 // Iterate through the results and print the info
 selectResult.foreach(row => {
@@ -98,8 +103,8 @@ selectResult.foreach(row => {
 })
 
 // Delete the line items and then the invoice
-(DELETE FROM li)(conn)
-(DELETE FROM i)(conn)
+DELETE FROM li go;
+DELETE FROM i go
 ````
 
 For an extended example, take a look at core_tests.scala.
