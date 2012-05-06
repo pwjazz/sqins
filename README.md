@@ -114,6 +114,13 @@ selectResult.foreach(row => {
   println("Line Item Timestamp: " + row._2.ts)
 })
 
+// User EXPR([string]) to plug in scalar expressions not natively supported by sqins
+val complicatedSelectQuery = (
+  SELECT(i.*, li.*)
+  FROM (i INNER_JOIN li ON i.id == li.invoice_id)
+  WHERE i.id == EXPR("(SELECT MAX(invoice_id) FROM line_item)")
+  ORDER_BY (i.id, li.ts DESC))
+  
 // Delete the line items and then the invoice
 DELETE FROM li go;
 DELETE FROM i go
