@@ -95,7 +95,7 @@ val li = line_item AS "li"
 
 // Query for invoices with line items
 val selectQuery = (
-  SELECT(i.*, li.*)
+  SELECT (i.*, li.*)
   FROM (i INNER_JOIN li ON i.id == li.invoice_id)
   ORDER_BY (i.id, li.ts DESC))
   
@@ -116,7 +116,7 @@ selectResult.foreach(row => {
 
 // User EXPR([string]) to plug in scalar expressions not natively supported by sqins
 val complicatedSelectQuery = (
-  SELECT(i.*, li.*)
+  SELECT (i.*, li.*)
   FROM (i INNER_JOIN li ON i.id == li.invoice_id)
   WHERE i.id == EXPR("(SELECT MAX(invoice_id) FROM line_item)")
   ORDER_BY (i.id, li.ts DESC))
