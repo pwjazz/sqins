@@ -1,5 +1,5 @@
-sqins (structured queries in Scala)
-===================================
+sqins - (s)tructured (q)ueries (in) (S)cala
+===========================================
 
 sqins makes SQL INSERT, UPDATE, DELETE and SELECT statements available inside Scala.  sqins makes 80% of typical DML
 really easy and stays out of the way for the other 20%.
@@ -9,6 +9,8 @@ really easy and stays out of the way for the other 20%.
 **Status** - Alpha
 
 **Author** - Percy Wegmann
+
+### Features
 
  * Not an ORM - sqins is just a SQL API
  * Strongly typed - compile time checking for SQL syntax and column types
