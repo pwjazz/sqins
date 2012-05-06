@@ -114,7 +114,12 @@ selectResult.foreach(row => {
   println("Line Item Timestamp: " + row._2.ts)
 })
 
-// User EXPR([string]) to plug in scalar expressions not natively supported by sqins
+// Use FN([string]) for your database's functions
+val queryWithFunctions = (
+  SELECT (i.*, FN("my_function")(li.amount))
+  FROM (i INNER_JOIN li ON i.id == li.invoice_id))
+
+// Use EXPR([string]) to plug in scalar expressions not natively supported by sqins
 val complicatedSelectQuery = (
   SELECT (i.*, li.*)
   FROM (i INNER_JOIN li ON i.id == li.invoice_id)
