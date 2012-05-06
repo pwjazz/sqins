@@ -63,24 +63,14 @@ class LineItemTable extends Table[LineItem, Long]("line_item") {
 /**
  * Test the basic operation of sqins queries
  */
-class FirstSpec extends FlatSpec with ShouldMatchers {
+class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
   // Set up variables for tables
   val invoice = new InvoiceTable()
   val line_item = new LineItemTable()
-  
+
   // Set up aliases too
   val i = invoice AS "i"
   val li = line_item AS "li"
-  
-  // Set up a connection
-  // Note - the connection is only needed to run queries
-  Class.forName("org.postgresql.Driver");
-  val url = "jdbc:postgresql://localhost/sqins"
-  val props = new java.util.Properties()
-  props.setProperty("user", "sqins")
-  props.setProperty("password", "sqins")
-
-  def conn = DriverManager.getConnection(url, props);
 
   "The SQL function" should "construct a generic SQL query that is usable for DML and other stuff not supported natively by sqins" in {
     SQL("""
@@ -151,7 +141,7 @@ class FirstSpec extends FlatSpec with ShouldMatchers {
   "An UPDATE statement" should "return the number of rows updated" in {
     val query = (
       UPDATE(li)
-      SET (SetExpression(li.amount, ?(56.78))))
+      SET (li.amount := ?(56.78), li.invoice_id := li.invoice_id))
 
     query(conn) should equal(1)
   }
@@ -159,13 +149,13 @@ class FirstSpec extends FlatSpec with ShouldMatchers {
   it should "support a WHERE clause" in {
     val query = (
       UPDATE(li)
-      SET (SetExpression(li.amount, ?(56.79)))
+      SET (li.amount := ?(56.79))
       WHERE (li.invoice_id == ?(1) && li.invoice_id <> li.id))
 
     query(conn) should equal(0)
   }
 
-  var simpleSelectQuery: SelectStatement[Invoice] = null
+  var simpleSelectQuery: SelectQuery[Invoice] = null
   "A simple SELECT statement" should "be constructable using projections" in {
     simpleSelectQuery = SELECT(i.*) FROM (i)
   }
@@ -187,14 +177,14 @@ class FirstSpec extends FlatSpec with ShouldMatchers {
   }
 
   "A SELECT statement" should "be able to return scalar values" in {
-    val query: SelectStatement[Long] = SELECT(i.id) FROM (i)
+    val query: SelectQuery[Long] = SELECT(i.id) FROM (i)
 
     query.expression should equal("""SELECT i.id
 FROM invoice AS i""")
   }
 
   it should "be writeable on multiple lines by wrapping in parentheses" in {
-    val query: SelectStatement[Long] = (
+    val query: SelectQuery[Long] = (
       SELECT(i.id)
       FROM (i))
 
@@ -203,18 +193,18 @@ FROM invoice AS i""")
   }
 
   it should "be able to contain bound scalar values in the select clause" in {
-    val query: SelectStatement[Int] = SELECT(?(5)) FROM (i)
+    val query: SelectQuery[Int] = SELECT(?(5)) FROM (i)
 
     query.expression should equal("""SELECT ?
 FROM invoice AS i""")
   }
 
   it should "be able to select individual fields into tuples" in {
-    val query: SelectStatement[Tuple2[Long, String]] = SELECT(i.id, i.description) FROM (i)
+    val query: SelectQuery[Tuple2[Long, String]] = SELECT(i.id, i.description) FROM (i)
   }
 
   it should "be able to contain joins" in {
-    val query: SelectStatement[Tuple2[Invoice, LineItem]] = (
+    val query: SelectQuery[Tuple2[Invoice, LineItem]] = (
       SELECT(i.*, li.*)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
 
@@ -231,7 +221,7 @@ FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""")
   }
 
   it should "be able to contain joins with multiple conditions and negations" in {
-    val query: SelectStatement[Tuple2[Invoice, LineItem]] = (
+    val query: SelectQuery[Tuple2[Invoice, LineItem]] = (
       SELECT(i.*, li.*)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id && NOT(i.id <> ?(5000))))
 
@@ -240,7 +230,7 @@ FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id AND NOT i.i
   }
 
   it should "be able to contain projections along with individual columns" in {
-    val query: SelectStatement[Tuple2[Invoice, BigDecimal]] = (
+    val query: SelectQuery[Tuple2[Invoice, BigDecimal]] = (
       SELECT(i.*, li.amount)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
 
@@ -249,7 +239,7 @@ FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""")
   }
 
   it should "be able to support distinct queries" in {
-    val query: SelectStatement[Tuple2[Invoice, BigDecimal]] = (
+    val query: SelectQuery[Tuple2[Invoice, BigDecimal]] = (
       SELECT DISTINCT (i.*, li.amount)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
 
@@ -291,7 +281,7 @@ ORDER BY i.id, i.id ASC, li.amount DESC""")
   }
 
   it should "support aggregations" in {
-    val query: SelectStatement[Tuple2[Long, BigDecimal]] = (
+    val query: SelectQuery[Tuple2[Long, BigDecimal]] = (
       SELECT(i.id, MAX(li.amount))
       FROM (i INNER_JOIN li ON i.id == li.invoice_id)
       GROUP_BY (i.id))
@@ -346,11 +336,11 @@ WHERE line_item.id = ?""")
   }
 
   it should "return the number of deleted rows" in {
-    val query = DELETE FROM line_item
-
-    query.expression should equal("DELETE FROM line_item")
-
-    query(conn) should equal(1)
+    on(conn) { implicit c =>
+        val query = DELETE FROM line_item
+        query.expression should equal("DELETE FROM line_item")
+        query.go should equal(1)
+    }
   }
 
   case class MyType(wrapped: String)

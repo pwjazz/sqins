@@ -79,9 +79,9 @@ class SQLError(sql: SQL, cause: Exception) extends RuntimeException("Error execu
   format(sql.query, sql.params.map(_.actual).mkString(","), cause.getMessage), cause)
 
 /**
- * An INSERT statement that can be executed as a function.
+ * An INSERT query that can be executed as a function.
  */
-case class InsertValuesStatement[T, +K](into: IntoItem[T, K], values: Seq[BoundValue[_]]) {
+case class InsertValuesQuery[T, +K](into: IntoItem[T, K], values: Seq[BoundValue[_]]) {
   def expression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
 
   def apply(implicit conn: Connection): Option[K] = {
@@ -95,21 +95,25 @@ case class InsertValuesStatement[T, +K](into: IntoItem[T, K], values: Seq[BoundV
       }
     })
   }
+  
+  def go(implicit conn: Connection) = apply(conn)
+  
+  override def toString = expression
 }
 
 /**
- * Syntax support for building InsertStatements using the INSERT keyword.
+ * Syntax support for building InsertQueries using the INSERT keyword.
  */
 object INSERT {
   def INTO[T, K](into: IntoItem[T, K]) = into
 }
 
-case class IncompleteUpdateStatement[T](table: Table[T, _]) {
-  def SET(set: Expression) = UpdateStatement(table, set)
+case class IncompleteUpdateQuery[T](table: Table[T, _]) {
+  def SET(set: Expression) = UpdateQuery(table, set)
 }
 
-case class UpdateStatement[T](table: Table[T, _], set: Expression, where: Option[Condition] = None) {
-  def WHERE(where: Condition) = UpdateStatement(table, set, Some(where))
+case class UpdateQuery[T](table: Table[T, _], set: Expression, where: Option[Condition] = None) {
+  def WHERE(where: Condition) = UpdateQuery(table, set, Some(where))
 
   def baseExpression = "UPDATE %1$s\nSET %2$s".format(table.fromExpression, set.expression)
 
@@ -118,7 +122,7 @@ case class UpdateStatement[T](table: Table[T, _], set: Expression, where: Option
     case None                   => baseExpression
   }
 
-  def apply(conn: Connection) = {
+  def apply(implicit conn: Connection) = {
     var boundValues = where match {
       case Some(where: Condition) => set.boundValues ++ where.boundValues
       case None                   => set.boundValues
@@ -126,14 +130,18 @@ case class UpdateStatement[T](table: Table[T, _], set: Expression, where: Option
 
     SQL(expression, boundValues).executeUpdate(conn)
   }
+  
+  def go(implicit conn: Connection) = apply(conn)
+  
+  override def toString = expression
 }
 
 object UPDATE {
-  def apply[T](table: Table[T, _]) = IncompleteUpdateStatement(table)
+  def apply[T](table: Table[T, _]) = IncompleteUpdateQuery(table)
 }
 
-case class DeleteStatement[T](table: Table[T, _], where: Option[Condition] = None) {
-  def WHERE(where: Condition) = DeleteStatement(table, Some(where))
+case class DeleteQuery[T](table: Table[T, _], where: Option[Condition] = None) {
+  def WHERE(where: Condition) = DeleteQuery(table, Some(where))
 
   def baseExpression = "DELETE FROM %1$s".format(table.fromExpression)
 
@@ -142,7 +150,7 @@ case class DeleteStatement[T](table: Table[T, _], where: Option[Condition] = Non
     case None                   => baseExpression
   }
 
-  def apply(conn: Connection) = {
+  def apply(implicit conn: Connection) = {
     var boundValues = where match {
       case Some(where: Condition) => where.boundValues
       case None                   => Seq()
@@ -150,23 +158,27 @@ case class DeleteStatement[T](table: Table[T, _], where: Option[Condition] = Non
 
     SQL(expression, boundValues).executeUpdate(conn)
   }
+  
+  def go(implicit conn: Connection) = apply(conn)
+  
+  override def toString = expression
 }
 
 object DELETE {
-  def FROM[T](table: Table[T, _]) = DeleteStatement(table)
+  def FROM[T](table: Table[T, _]) = DeleteQuery(table)
 }
 
 /**
- * A SELECT statement missing its FROM clause.
+ * A SELECT query missing its FROM clause.
  */
-case class IncompleteSelectStatement[T](select: Extractable[T] with Expression, distinct: Boolean) {
-  def FROM(from: FromItem) = SelectStatement(select, distinct, from)
+case class IncompleteSelectQuery[T](select: Extractable[T] with Expression, distinct: Boolean) {
+  def FROM(from: FromItem) = SelectQuery(select, distinct, from)
 }
 
 /**
- * A SELECT statement that can be executed as a function.
+ * A SELECT query that can be executed as a function.
  */
-case class SelectStatement[T](select: Extractable[T] with Expression, distinct: Boolean, from: FromItem, where: Option[Condition] = None, orderBy: Option[Expression] = None, groupBy: Option[Expression] = None) {
+case class SelectQuery[T](select: Extractable[T] with Expression, distinct: Boolean, from: FromItem, where: Option[Condition] = None, orderBy: Option[Expression] = None, groupBy: Option[Expression] = None) {
   /**
    * Build the expression representing this query
    */
@@ -198,17 +210,17 @@ case class SelectStatement[T](select: Extractable[T] with Expression, distinct: 
   /**
    * Add a WHERE clause.
    */
-  def WHERE(where: Condition) = SelectStatement(select, distinct, from, Some(where), orderBy, groupBy)
+  def WHERE(where: Condition) = SelectQuery(select, distinct, from, Some(where), orderBy, groupBy)
 
   /**
    * Add a GROUP BY clause.
    */
-  def GROUP_BY(groupBy: Expression) = SelectStatement(select, distinct, from, where, orderBy, Some(groupBy))
+  def GROUP_BY(groupBy: Expression) = SelectQuery(select, distinct, from, where, orderBy, Some(groupBy))
 
   /**
    * Add an ORDER BY clause.
    */
-  def ORDER_BY(orderBy: Expression) = SelectStatement(select, distinct, from, where, Some(orderBy), groupBy)
+  def ORDER_BY(orderBy: Expression) = SelectQuery(select, distinct, from, where, Some(orderBy), groupBy)
 
   def apply(implicit conn: Connection) = {
     var boundValues = select.boundValues
@@ -229,21 +241,23 @@ case class SelectStatement[T](select: Extractable[T] with Expression, distinct: 
 
     new SelectResult(SQL(expression, boundValues).executeQuery, (rs: ResultSet) => select.extract(rs, 1).value)
   }
+  
+  def go(implicit conn: Connection) = apply(conn)
 
   override def toString = expression
 }
 
 /**
- * Syntax support for building SelectStatements using the SELECT keyword.
+ * Syntax support for building SelectQuerys using the SELECT keyword.
  */
 object SELECT {
-  def apply[T](expression: Extractable[T] with Expression) = IncompleteSelectStatement(expression, false)
+  def apply[T](expression: Extractable[T] with Expression) = IncompleteSelectQuery(expression, false)
 
-  def DISTINCT[T](expression: Extractable[T] with Expression) = IncompleteSelectStatement(expression, true)
+  def DISTINCT[T](expression: Extractable[T] with Expression) = IncompleteSelectQuery(expression, true)
 }
 
 /**
- * The result of executing a SELECT statement.
+ * The result of executing a SELECT query.
  */
 class SelectResult[T](rs: ResultSet, rowReader: (ResultSet => T)) extends Iterable[T] {
   def iterator = new SelectResultIterator(rs, rowReader)
@@ -259,4 +273,21 @@ protected class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => 
   }
 
   def next = rowReader(rs)
+}
+
+object on {
+  def apply[T](conn: Connection)(fn: (Connection) => T) = fn(conn)
+}
+
+object transaction {
+  def apply[T](conn: Connection)(fn: (Connection) => T) = {
+    val originalAutoCommit = conn.getAutoCommit()
+    conn.setAutoCommit(false)
+    try {
+      fn(conn)
+      conn.commit()
+    } finally {
+      conn.setAutoCommit(originalAutoCommit)
+    }
+  }
 }
