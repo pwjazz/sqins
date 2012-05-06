@@ -12,7 +12,7 @@ really easy and stays out of the way for the other 20%.
 
 ### Benefits
 
- * Looks like SQL - if you know SQL, you pretty much know sqins.
+ * Looks like SQL - if you know SQL, you pretty much know sqins
  * Strongly typed - compile time checking for SQL syntax and column types
  * Not an ORM - sqins is just a SQL API
  * Simple mapping - unlike an ORM, sqins just needs to know the most basic things about your tables and columns
