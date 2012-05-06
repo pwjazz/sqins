@@ -34,7 +34,7 @@ case class LineItem(id: Long = -1,
                     invoice_id: Long,
                     amount: BigDecimal,
                     ts: Timestamp = new Timestamp(System.currentTimeMillis)) {
-  // We can set up queries directly inside our objects if we want (ActiveRecord pattern)
+  // Set up a query directly inside our object (ActiveRecord anyone?)
   private val line_item = new LineItemTable()
 
   def insert = INSERT INTO (line_item) VALUES (this)
@@ -64,33 +64,43 @@ val invoice = new InvoiceTable()
 val line_item = new LineItemTable()
 
 // Set up a connection
-implicit val conn: Connection = getConnection // get your connection from wherever you like
+val conn: Connection = getConnection // get your connection from wherever you like
 
-// We can set up queries inline
-val query = INSERT INTO invoice VALUES (Invoice(description = "An invoice"))
+// Set up some queries
+val newInvoice = Invoice(description = "An invoice")
+val query = INSERT INTO invoice VALUES (newInvoice)
 
-// Let's insert an invoice and some line items 
+// Insert an invoice and some line items 
 query(conn) match {
   // If the insert succeeds, we get back the inserted id
   case Some(invoiceId: Long) => {
-    for (i <- 1 to 5) yield LineItem(invoice_id = invoiceId, amount = i).insert(conn)
+    for (i <- 1 to 5) yield
+      LineItem(invoice_id = invoiceId, amount = i).insert(conn)
   }
   case None => // ignore
 }
 
-// Since conn is implicit, we'll stop using it since it's actually not needed explicitly
-// Let's update the amount on all of our line items
+// Make the connection implicit so we don't have to keep using it explicitly
+implicit val implicitConn = conn
+
+// Update the amount on all of our line items
+// Notice the use of ?() to bind the value 50
 UPDATE(line_item) SET (line_item.amount := ?(50)) go
 
-// Let's query for invoices with line items, and let's use aliases while we're at it
+// Set up some aliases for our tables
 val i = invoice AS "i"
 val li = line_item AS "li"
 
+// Query for invoices with line items
 val selectQuery = (
   SELECT(i.*, li.*)
   FROM (i INNER_JOIN li ON i.id == li.invoice_id)
   ORDER_BY (i.id, li.ts DESC))
+  
+// Print out our query expression just to see what it looks like
+println(selectQuery.expression)
 
+// Run the query
 val selectResult = selectQuery go
 
 // Iterate through the results and print the info
