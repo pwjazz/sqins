@@ -89,6 +89,18 @@ private[sqins] trait ScalarExpression extends Expression {
 }
 
 /**
+ * A scalar expression that is just a string. Useful for plugging in stuff not natively supported by the syntax.
+ */
+case class ConstantScalarExpression(expression: String) extends ScalarExpression
+
+/**
+ * Factory for ScalarConstantExpressions
+ */
+object EXPR {
+  def apply(expression: String) = ConstantScalarExpression(expression)
+}
+
+/**
  * An expression that represents (or returns) a value.
  */
 private[sqins] trait Value[+T] extends ScalarExpression with Extractable[T] {
@@ -162,7 +174,7 @@ trait IntoItem[T, +K] {
 }
 
 /**
- * An item from which one can select, such as a table, list of tables, joined tables.
+ * An item from which one can select, such as a table, list of tables, joined tables, sub-selects.
  */
 trait FromItem {
   def fromExpression: String

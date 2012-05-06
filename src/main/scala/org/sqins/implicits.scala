@@ -95,10 +95,16 @@ object Implicits {
 
   // Allow Aliases to be treated as whatever was aliased
   implicit def aliasToAliased[T, E <: Value[T]](alias: Alias[T, E]) = alias.aliased
-
+  
   // Built-in functions (aggregates, etc)
   val AVG = FN("AVG")
+  val COUNT = FN("COUNT")
+  val COUNT_* = EXPR("COUNT(*)")
+  val MIN = FN("MIN")
   val MAX = FN("MAX")
+  val SUM = FN("SUM")
+  val VAR_POP = FN("VAR_POP")
+  val VAR_SAMP = FN("VAR_SAMP")
 
   // Automatically convert tuples of expressions into single Expressions
   implicit def tuple2ToExpression[T1 <: Expression, T2 <: Expression](tuple: Tuple2[T1, T2]) = CompoundExpression2(tuple._1, tuple._2)

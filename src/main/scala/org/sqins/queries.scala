@@ -178,7 +178,7 @@ case class IncompleteSelectQuery[T](select: Extractable[T] with Expression, dist
 /**
  * A SELECT query that can be executed as a function.
  */
-case class SelectQuery[T](select: Extractable[T] with Expression, distinct: Boolean, from: FromItem, where: Option[Condition] = None, orderBy: Option[Expression] = None, groupBy: Option[Expression] = None) {
+case class SelectQuery[T](select: Extractable[T] with Expression, distinct: Boolean, from: FromItem, where: Option[Condition] = None, orderBy: Option[Expression] = None, groupBy: Option[Expression] = None, limit: Option[BoundValue[Long]] = None, offset: Option[BoundValue[Long]] = None) {
   /**
    * Build the expression representing this query
    */
@@ -203,24 +203,44 @@ case class SelectQuery[T](select: Extractable[T] with Expression, distinct: Bool
       case Some(orderBy: Expression) => expression = "%1$s\nORDER BY %2$s".format(expression, orderBy.expression)
       case None                      => // ignore
     }
+    
+    limit match {
+      case Some(limit: BoundValue[Long]) => expression = "%1$s\nLIMIT ?".format(expression)
+      case None                      => // ignore
+    }
 
+    offset match {
+      case Some(offset: BoundValue[Long]) => expression = "%1$s\nOFFSET ?".format(expression)
+      case None                      => // ignore
+    }
+    
     expression
   }
 
   /**
    * Add a WHERE clause.
    */
-  def WHERE(where: Condition) = SelectQuery(select, distinct, from, Some(where), orderBy, groupBy)
+  def WHERE(where: Condition) = SelectQuery(select, distinct, from, Some(where), orderBy, groupBy, limit, offset)
 
   /**
    * Add a GROUP BY clause.
    */
-  def GROUP_BY(groupBy: Expression) = SelectQuery(select, distinct, from, where, orderBy, Some(groupBy))
+  def GROUP_BY(groupBy: Expression) = SelectQuery(select, distinct, from, where, orderBy, Some(groupBy), limit, offset)
 
   /**
    * Add an ORDER BY clause.
    */
-  def ORDER_BY(orderBy: Expression) = SelectQuery(select, distinct, from, where, Some(orderBy), groupBy)
+  def ORDER_BY(orderBy: Expression) = SelectQuery(select, distinct, from, where, Some(orderBy), groupBy, limit, offset)
+  
+  /**
+   * Add a LIMIT clause.
+   */
+  def LIMIT(limit: BoundValue[Long]) = SelectQuery(select, distinct, from, where, orderBy, groupBy, Some(limit), offset)
+  
+  /**
+   * Add an OFFSET clause.
+   */
+  def OFFSET(offset: BoundValue[Long]) = SelectQuery(select, distinct, from, where, orderBy, groupBy, limit, Some(offset))
 
   def apply(implicit conn: Connection) = {
     var boundValues = select.boundValues
@@ -236,6 +256,16 @@ case class SelectQuery[T](select: Extractable[T] with Expression, distinct: Bool
 
     orderBy match {
       case Some(orderBy: Expression) => boundValues ++= orderBy.boundValues
+      case None                      => // ignore
+    }
+    
+    limit match {
+      case Some(limit: BoundValue[Long]) => boundValues ++= Seq(limit)
+      case None                      => // ignore
+    }
+
+    offset match {
+      case Some(offset: BoundValue[Long]) => boundValues ++= Seq(offset)
       case None                      => // ignore
     }
 

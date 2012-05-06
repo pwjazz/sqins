@@ -290,6 +290,34 @@ ORDER BY i.id, i.id ASC, li.amount DESC""")
 FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
 GROUP BY i.id""")
   }
+  
+  it should "support LIMIT and OFFSET clauses" in {
+    val query: SelectQuery[Invoice] = (
+        SELECT(i.*)
+        FROM(i)
+        LIMIT ?(5)
+        OFFSET ?(10))
+        
+    query.expression should equal("""SELECT i.id, i.description
+FROM invoice AS i
+LIMIT ?
+OFFSET ?""")
+    
+    query(conn).toList.length should equal(0)
+  }
+  
+  it should "support the use of strings to plug in expressions for unsupported syntax" in {
+    val query: SelectQuery[Invoice] = (
+        SELECT(i.*)
+        FROM(i)
+        WHERE(i.id == EXPR("(SELECT MAX(id) FROM line_item)")))
+        
+    query.expression should equal("""SELECT i.id, i.description
+FROM invoice AS i
+WHERE i.id = (SELECT MAX(id) FROM line_item)""")
+    
+    query(conn).toList.length should equal(1)
+  }
 
   "A SELECT query" should "allows us to put together aggregations, wheres and all this other stuff and work correctly" in {
     def findLineItemsForInvoice(invoiceId: Long) = (
@@ -297,7 +325,9 @@ GROUP BY i.id""")
       FROM (i INNER_JOIN li ON i.id == li.invoice_id && i.id == li.invoice_id)
       WHERE (i.id == ?(invoiceId) && NOT(i.id <> ?(5000)))
       ORDER_BY (i.id ASC, li.ts DESC)
-      GROUP_BY (i.*, li.id, li.invoice_id, li.ts))
+      GROUP_BY (i.*, li.id, li.invoice_id, li.ts)
+      LIMIT ?(3)
+      OFFSET ?(0))
 
     val query = findLineItemsForInvoice(1)
 
@@ -306,7 +336,9 @@ GROUP BY i.id""")
 FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id AND i.id = li.invoice_id
 WHERE i.id = ? AND NOT i.id <> ?
 GROUP BY i.id, i.description, li.id, li.invoice_id, li.ts
-ORDER BY i.id ASC, li.ts DESC""")
+ORDER BY i.id ASC, li.ts DESC
+LIMIT ?
+OFFSET ?""")
 
     // Run the query
     val result: Iterable[(Invoice, LineItem, BigDecimal, BigDecimal, Int)] = query(conn)

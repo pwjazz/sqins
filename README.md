@@ -10,16 +10,16 @@ really easy and stays out of the way for the other 20%.
 
 **Author** - Percy Wegmann
 
-### Features
+### Benefits
 
- * Not an ORM - sqins is just a SQL API
- * Strongly typed - compile time checking for SQL syntax and column types
  * Syntax very similar to SQL - if you know SQL, you know sqins
- * Simple object mapping - unlike an ORM, sqins just needs to know the most basic things about your tables and columns
+ * Strongly typed - compile time checking for SQL syntax and column types
+ * Not an ORM - sqins is just a SQL API
+ * Simple mapping - unlike an ORM, sqins just needs to know the most basic things about your tables and columns
  * Extensible scalar types - sqins comes with support for basic types like numbers, strings and dates and makes it super-easy to define new type mappings
  * Stateless - sqins doesn't cache data, maintain identity or relationships or do any other ORM funkiness
  * Smart performance - sqnis employs common-sense optimizations like using PreparedStatements, streaming results from cursors, etc.
- * Tested with Postgres - other databases on the way
+ * Works with PostgreSQL - other databases on the way
 
 ### A quick example
 
@@ -120,6 +120,59 @@ DELETE FROM i go
 ````
 
 For an extended example, take a look at core_tests.scala.
+
+### Supported SQL Features
+
+#### INSERT queries
+
+````
+INSERT INTO table [ ( column [, ...] ) ]
+    VALUES ( expression [, ...] )
+````
+
+#### UPDATE queries
+
+````
+UPDATE table [ [ AS ] alias ]
+    SET { column = expression } [,...]
+          ( column [, ...] ) = ( { expression | DEFAULT } [, ...] ) } [, ...]
+````
+
+#### DELETE queries
+
+````
+DELETE FROM table [ [ AS ] alias ]
+    [ WHERE condition ]
+````
+
+#### SELECT queries
+
+````
+SELECT [ DISTINCT ] ]
+    * | expression [ [ AS ] output_name ] [, ...]
+    [ FROM from_item [, ...] ]
+    [ WHERE condition ]
+    [ GROUP BY expression [, ...] ]
+    [ HAVING condition [, ...] ]
+    [ ORDER BY expression [ ASC | DESC ] [, ...] ]
+    [ LIMIT { count } ]
+    [ OFFSET start [ ROW ] ]
+````
+
+### Roadmap
+
+* All queries
+    * Support for correlated subquery in expressions
+    * Support for correlated subquery in conditions 
+* INSERT queries
+    * Support for using a SELECT query in lieu of the VALUES clause
+    * Support for DEFAULT column values in the VALUES clause    
+* SELECT queries
+    * Support for UNION, INTERSECT and EXCEPT
+* Database Support
+    * MySQL
+    * Oracle
+    * SqlServer
 
 ### Setup in SBT
 
