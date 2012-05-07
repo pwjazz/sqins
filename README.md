@@ -32,12 +32,13 @@ import org.sqins.Implicits._
 
 // Define our Scala model (needs to be case classes)
 case class Invoice(id: Long = -1,
-                   description: String)
+                   description: String,
+                   image: Option[Array[Byte]] = None)
 
 case class LineItem(id: Long = -1,
                     invoice_id: Long,
                     amount: BigDecimal,
-                    ts: Timestamp = new java.sql.Timestamp(new java.util.Date().getTime())) {
+                    ts: Timestamp = new Timestamp(System.currentTimeMillis()) {
   // Set up a query directly inside our object (ActiveRecord anyone?)
   private val line_item = new LineItemTable()
 
