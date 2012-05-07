@@ -92,6 +92,11 @@ object Implicits {
     _get = (rs: ResultSet, position: Int) => Extraction(rs.getTimestamp(position), 1),
     _set = (ps: PreparedStatement, position: Int, value: Timestamp) => ps.setTimestamp(position, value))
   implicit val OptionTimestampTypeMapping = new OptionTypeMapping(TimestampTypeMapping)
+  
+  implicit val ByteArrayTypeMapping = new TypeMapping[Array[Byte]](
+    _get = (rs: ResultSet, position: Int) => Extraction(rs.getBytes(position), 1),
+    _set = (ps: PreparedStatement, position: Int, value: Array[Byte]) => ps.setBytes(position, value))
+  implicit val OptionByteArrayTypeMapping = new OptionTypeMapping(ByteArrayTypeMapping)
 
   // Allow Aliases to be treated as whatever was aliased
   implicit def aliasToAliased[T, E <: Value[T]](alias: Alias[T, E]) = alias.aliased
