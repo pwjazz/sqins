@@ -37,7 +37,7 @@ case class Invoice(id: Long = -1,
 case class LineItem(id: Long = -1,
                     invoice_id: Long,
                     amount: BigDecimal,
-                    ts: Timestamp) {
+                    ts: Timestamp = new java.sql.Timestamp(new java.util.Date().getTime())) {
   // Set up a query directly inside our object (ActiveRecord anyone?)
   private val line_item = new LineItemTable()
 
@@ -76,13 +76,10 @@ val newInvoice = Invoice(description = "An invoice")
 val query = INSERT INTO invoice VALUES (newInvoice)
 
 // Insert an invoice and some line items 
-query(conn) match {
-  // If the insert succeeds, we get back the inserted id
-  case Some(invoiceId: Long) => {
-    for (i <- 1 to 5) yield
-      LineItem(invoice_id = invoiceId, amount = i).insert(conn)
-  }
-  case None => // ignore
+val newInvoiceId:Option[Long] = query(conn) 
+newInvoiceId.map { id =>
+  for (i <- 1 to 5) yield
+    LineItem(invoice_id = id, amount = i).insert(conn)
 }
 
 // Make the connection implicit so we don't have to keep using it explicitly
