@@ -166,7 +166,7 @@ case class FN(name: String) {
 trait IntoItem[T, +K] {
   def intoExpression: String
   
-  def primaryKey: Option[Extractable[K]]
+  def primaryKey: Option[PrimaryKey[K]]
   
   def VALUES(row: T): InsertValuesQuery[T, K]
   
@@ -231,11 +231,11 @@ abstract class Relation(val name: String) extends FromItem {
  */
 abstract class Table[T: Manifest, K](override val name: String) extends Relation(name) with IntoItem[T, K] {
   val rowType = manifest[T]
-  private var _primaryKey: Option[Extractable[K]] = None
+  private var _primaryKey: Option[PrimaryKey[K]] = None
   
-  def primaryKey() = _primaryKey
+  def primaryKey = _primaryKey
   
-  def primaryKey(keyExtractor: Extractable[K]): Unit = _primaryKey = Some(keyExtractor)
+  def primaryKey(column: ColumnDef[K, this.type]): Unit = _primaryKey = Some(PrimaryKey(column))
 
   implicit def relation = this
 
@@ -286,7 +286,13 @@ abstract class Table[T: Manifest, K](override val name: String) extends Relation
   def * = Projection(this)
 }
 
-case class PrimaryKey[T, K](table: Table[T, K], keySource: Extractable[K])
+case class PrimaryKey[+K](column: ColumnDef[K, _ <: Relation]) extends Extractable[K] with Expression {
+  def expression = column.expression
+  
+  def extract(rs: ResultSet, position: Int) = column.extract(rs, position)
+  
+  def ==[T](row: T) = column == column.boundValueFrom(row)
+}
 
 /**
  * An into clause with a restricted list of columns.

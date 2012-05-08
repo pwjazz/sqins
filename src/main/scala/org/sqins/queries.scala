@@ -111,7 +111,7 @@ object INSERT {
 case class IncompleteUpdateQuery[T](table: Table[T, _]) {
   def SET(set: Expression) = UpdateQuery(table, set)
   
-  def SET(row: T) = UpdateQuery(table, table.setExpression(row))
+  def SET(row: T) = UpdateQuery(table, table.setExpression(row), table.primaryKey.map((_ == row)))
 }
 
 case class UpdateQuery[T](table: Table[T, _], set: Expression, where: Option[Condition] = None) {

@@ -27,7 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package org.sqins
 
-import java.sql.{Connection, DriverManager, Timestamp, PreparedStatement, ResultSet}
+import java.sql.{ Connection, DriverManager, Timestamp, PreparedStatement, ResultSet }
 import org.scalatest.FlatSpec
 import org.scalatest.matchers.ShouldMatchers
 import org.sqins.Implicits._
@@ -140,7 +140,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       case None => fail("There should have been an invoice id")
     }
   }
-  
+
   "An UPDATE statement" should "return the number of rows updated" in {
     val query = (
       UPDATE(li)
@@ -148,7 +148,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
     query(conn) should equal(1)
   }
-  
+
   it should "support a WHERE clause" in {
     val query = (
       UPDATE(li)
@@ -157,12 +157,15 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
     query(conn) should equal(0)
   }
-  
+
   it should "allow setting whole rows" in {
     val newLineItem = LineItem(id = 1, invoice_id = 1, amount = 56.78)
-    
-    val query = UPDATE(li) SET(newLineItem)
 
+    val query = UPDATE(li) SET (newLineItem)
+
+    query.expression should equal("""|UPDATE line_item AS li
+                                     |SET invoice_id = ?, amount = ?
+                                     |WHERE li.id = ?""".stripMargin)
     query(conn) should equal(1)
   }
 
@@ -191,7 +194,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
     val query: SelectQuery[Long] = SELECT(i.id) FROM (i)
 
     query.expression should equal(
-        """|SELECT i.id
+      """|SELECT i.id
            |FROM invoice AS i""".stripMargin)
   }
 
@@ -201,7 +204,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       FROM (i))
 
     query.expression should equal(
-        """|SELECT i.id
+      """|SELECT i.id
            |FROM invoice AS i""".stripMargin)
   }
 
@@ -209,7 +212,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
     val query: SelectQuery[Int] = SELECT(?(5)) FROM (i)
 
     query.expression should equal(
-        """|SELECT ?
+      """|SELECT ?
            |FROM invoice AS i""".stripMargin)
   }
 
@@ -223,7 +226,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
 
     query.expression should equal(
-        """|SELECT i.id, i.description, i.image, li.id, li.invoice_id, li.amount, li.ts
+      """|SELECT i.id, i.description, i.image, li.id, li.invoice_id, li.amount, li.ts
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""".stripMargin)
 
     query(conn).foreach(row => {
@@ -241,7 +244,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       FROM (i INNER_JOIN li ON i.id == li.invoice_id && NOT(i.id <> ?(5000))))
 
     query.expression should equal(
-        """|SELECT i.id, i.description, i.image, li.id, li.invoice_id, li.amount, li.ts
+      """|SELECT i.id, i.description, i.image, li.id, li.invoice_id, li.amount, li.ts
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id AND NOT i.id <> ?""".stripMargin)
   }
 
@@ -251,7 +254,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
 
     query.expression should equal(
-        """|SELECT i.id, i.description, i.image, li.amount
+      """|SELECT i.id, i.description, i.image, li.amount
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""".stripMargin)
   }
 
@@ -261,7 +264,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
 
     query.expression should equal(
-        """|SELECT DISTINCT i.id, i.description, i.image, li.amount
+      """|SELECT DISTINCT i.id, i.description, i.image, li.amount
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""".stripMargin)
   }
 
@@ -272,7 +275,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       WHERE (i.id == ?(1)))
 
     query.expression should equal(
-        """|SELECT DISTINCT i.id, i.description, i.image, li.amount
+      """|SELECT DISTINCT i.id, i.description, i.image, li.amount
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
            |WHERE i.id = ?""".stripMargin)
   }
@@ -284,7 +287,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       WHERE (i.id == ?(invoiceId)))
 
     buildQuery(1).expression should equal(
-        """|SELECT DISTINCT i.id, i.description, i.image, li.amount
+      """|SELECT DISTINCT i.id, i.description, i.image, li.amount
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
            |WHERE i.id = ?""".stripMargin)
   }
@@ -296,7 +299,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       ORDER_BY (i.id, i.id ASC, li.amount DESC))
 
     query.expression should equal(
-        """|SELECT DISTINCT i.id, i.description, i.image, li.amount
+      """|SELECT DISTINCT i.id, i.description, i.image, li.amount
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
            |ORDER BY i.id, i.id ASC, li.amount DESC""".stripMargin)
   }
@@ -308,38 +311,38 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       GROUP_BY (i.id))
 
     query.expression should equal(
-        """|SELECT i.id, MAX(li.amount)
+      """|SELECT i.id, MAX(li.amount)
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
            |GROUP BY i.id""".stripMargin)
   }
-  
+
   it should "support LIMIT and OFFSET clauses" in {
     val query: SelectQuery[Invoice] = (
-        SELECT(i.*)
-        FROM(i)
-        LIMIT ?(5)
-        OFFSET ?(10))
-        
+      SELECT(i.*)
+      FROM (i)
+      LIMIT ?(5)
+      OFFSET ?(10))
+
     query.expression should equal(
-        """|SELECT i.id, i.description, i.image
+      """|SELECT i.id, i.description, i.image
            |FROM invoice AS i
            |LIMIT ?
            |OFFSET ?""".stripMargin)
-    
+
     query(conn).toList.length should equal(0)
   }
-  
+
   it should "support the use of strings to plug in expressions for unsupported syntax" in {
     val query: SelectQuery[Invoice] = (
-        SELECT(i.*)
-        FROM(i)
-        WHERE(i.id == EXPR("(SELECT MAX(id) FROM line_item)")))
-        
+      SELECT(i.*)
+      FROM (i)
+      WHERE (i.id == EXPR("(SELECT MAX(id) FROM line_item)")))
+
     query.expression should equal(
-        """|SELECT i.id, i.description, i.image
+      """|SELECT i.id, i.description, i.image
            |FROM invoice AS i
            |WHERE i.id = (SELECT MAX(id) FROM line_item)""".stripMargin)
-    
+
     query(conn).toList.length should equal(1)
   }
 
@@ -389,18 +392,18 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       VALUES (?(invoice.description)))
 
     val imageData = scala.io.Source.fromFile(
-        new java.io.File("test_image.jpg"))
-        .map(_.toByte)
-        .toArray
+      new java.io.File("test_image.jpg"))
+      .map(_.toByte)
+      .toArray
     val invoice = Invoice(description = "An invoice", image = Some(imageData))
     insertInvoice(invoice)(conn)
   }
-  
+
   "A DELETE query" should "support a WHERE clause" in {
     val query = DELETE FROM line_item WHERE line_item.id == ?(-50)
 
     query.expression should equal(
-        """|DELETE FROM line_item
+      """|DELETE FROM line_item
            |WHERE line_item.id = ?""".stripMargin)
 
     query(conn)
@@ -408,9 +411,9 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
   it should "return the number of deleted rows" in {
     on(conn) { implicit c =>
-        val query = DELETE FROM line_item
-        query.expression should equal("DELETE FROM line_item")
-        query.go should equal(1)
+      val query = DELETE FROM line_item
+      query.expression should equal("DELETE FROM line_item")
+      query.go should equal(1)
     }
   }
 
