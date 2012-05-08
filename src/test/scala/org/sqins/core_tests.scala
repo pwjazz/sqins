@@ -144,11 +144,11 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
   "An UPDATE statement" should "return the number of rows updated" in {
     val query = (
       UPDATE(li)
-      SET (li.amount := ?(56.78), li.invoice_id := li.invoice_id))
+      SET (li.amount := ?(56.77), li.invoice_id := li.invoice_id))
 
     query(conn) should equal(1)
   }
-
+  
   it should "support a WHERE clause" in {
     val query = (
       UPDATE(li)
@@ -156,6 +156,14 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       WHERE (li.invoice_id == ?(1) && li.invoice_id <> li.id))
 
     query(conn) should equal(0)
+  }
+  
+  it should "allow setting whole rows" in {
+    val newLineItem = LineItem(id = 1, invoice_id = 1, amount = 56.78)
+    
+    val query = UPDATE(li) SET(newLineItem)
+
+    query(conn) should equal(1)
   }
 
   var simpleSelectQuery: SelectQuery[Invoice] = null
