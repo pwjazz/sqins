@@ -91,8 +91,8 @@ implicit val implicitConn = conn
 UPDATE(line_item) SET (line_item.amount := ?(50)) go
 
 // You can also do a whole object update if you want
-val updateLineItem = LineItem(id = 1, invoice_id = 1, amount = 50)
-UPDATE(line_item) SET (line_item) go
+val updatedLineItem = LineItem(id = 1, invoice_id = 1, amount = 50)
+UPDATE(line_item) SET (updatedLineItem) go
 
 // Set up some aliases for our tables
 val i = invoice AS "i"
