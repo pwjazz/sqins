@@ -90,13 +90,10 @@ implicit val implicitConn = conn
 // Notice the use of ?() to bind the value 50
 UPDATE(line_item) SET (line_item.amount := ?(50)) go
 
-<<<<<<< HEAD
 // You can also do a whole object update if you want
 val updateLineItem = LineItem(id = 1, invoice_id = 1, amount = 50)
 UPDATE(line_item) SET (line_item) go
 
-=======
->>>>>>> 3e395ac491d93e4c1aab1f5fb41a82dc7f874582
 // Set up some aliases for our tables
 val i = invoice AS "i"
 val li = line_item AS "li"
@@ -137,12 +134,9 @@ val complicatedSelectQuery = (
 // Delete the line items and then the invoice
 DELETE FROM li go;
 DELETE FROM i go
-<<<<<<< HEAD
 
 // You can also run arbitrary SQL like this
 SQL("""put some really complicated sql in here""")(conn)
-=======
->>>>>>> 3e395ac491d93e4c1aab1f5fb41a82dc7f874582
 ````
 
 For an extended example, take a look at core_tests.scala.
@@ -160,11 +154,7 @@ INSERT INTO table [ ( column [, ...] ) ]
 
 ````
 UPDATE table [ [ AS ] alias ]
-<<<<<<< HEAD
     SET {{ column = expression } [,...] | row }
-=======
-    SET { column = expression } [,...]
->>>>>>> 3e395ac491d93e4c1aab1f5fb41a82dc7f874582
           ( column [, ...] ) = ( { expression | DEFAULT } [, ...] ) } [, ...]
 ````
 
