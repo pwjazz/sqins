@@ -181,7 +181,13 @@ SELECT [ DISTINCT ] ]
 
 ### Roadmap
 
+* Documentation
+    * Create user guide
+    * Clean up class and method visibility
+    * Generate scaladoc
 * All queries
+    * Support for multi-column primary keys
+    * Support for no primary keys (already there, but needs testing)
     * Support for correlated subqueries in expressions
     * Support for correlated subqueries in conditions 
     * Support for mapping to non-case classes???
