@@ -139,7 +139,7 @@ DELETE FROM i go
 SQL("""put some really complicated sql in here""")(conn)
 ````
 
-For an extended example, take a look at core_tests.scala.
+For an extended example, take a look at [core_tests.scala](blob/master/src/test/scala/org/sqins/core_tests.scala).
 
 ### Supported SQL Features
 
