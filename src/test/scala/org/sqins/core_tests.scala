@@ -143,7 +143,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
   it should "also allow INSERT ... SELECT FROM semantics" in {
     val query = (INSERT INTO invoice(invoice.description, invoice.image)
-      SELECT (invoice.description, invoice.image) FROM (invoice) WHERE (invoice.id == ?(-1)))
+      SELECT (invoice.description, invoice.image) FROM invoice WHERE invoice.id == ?(-1))
 
     query.insertExpression should equal("""|INSERT INTO invoice (description, image)
                                           |SELECT invoice.description, invoice.image
@@ -154,7 +154,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
   }
 
   it should "also allow INSERT ... SELECT FROM semantics using a predefined sub query" in {
-    val subQuery = SELECT(invoice.description, invoice.image) FROM (invoice) WHERE (invoice.id == ?(-1))
+    val subQuery = SELECT (invoice.description, invoice.image) FROM invoice WHERE invoice.id == ?(-1)
     val query = (INSERT INTO invoice(invoice.description, invoice.image))(subQuery)
 
     query.insertExpression should equal("""|INSERT INTO invoice (description, image)
@@ -177,7 +177,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
     val query = (
       UPDATE(li)
       SET (li.amount := ?(56.79))
-      WHERE (li.invoice_id == ?(1) && li.invoice_id <> li.id))
+      WHERE li.invoice_id == ?(1) && li.invoice_id <> li.id)
 
     query(conn) should equal(0)
   }
@@ -198,7 +198,10 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
     val li2 = line_item AS "li2"
 
-    val query = UPDATE(li) SET (li.amount := (SELECT(MAX(li2.amount)) FROM li2 WHERE li2.id == li.id && li2.id <> ?(-1)))
+    val query = UPDATE(li) SET (li.amount := (
+      SELECT (MAX(li2.amount))
+      FROM li2
+      WHERE li2.id == li.id && li2.id <> ?(-1)))
 
     query.updateExpression should equal("""|UPDATE line_item AS li
                                            |SET amount = (SELECT MAX(li2.amount)
@@ -210,7 +213,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
   var simpleSelectQuery: SelectQuery[Invoice] = null
   "A simple SELECT statement" should "be constructable using projections" in {
-    simpleSelectQuery = SELECT(i.*) FROM (i)
+    simpleSelectQuery = SELECT (i.*) FROM i
   }
 
   var simpleSelectResult: SelectResult[Invoice] = null
@@ -230,7 +233,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
   }
 
   "A SELECT statement" should "be able to return scalar values" in {
-    val query: SelectQuery[Long] = SELECT(i.id) FROM (i)
+    val query: SelectQuery[Long] = SELECT (i.id) FROM i
 
     query.queryExpression should equal(
       """|SELECT i.id
@@ -239,8 +242,8 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
   it should "be writeable on multiple lines by wrapping in parentheses" in {
     val query: SelectQuery[Long] = (
-      SELECT(i.id)
-      FROM (i))
+      SELECT (i.id)
+      FROM i)
 
     query.queryExpression should equal(
       """|SELECT i.id
@@ -248,7 +251,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
   }
 
   it should "be able to contain bound scalar values in the select clause" in {
-    val query: SelectQuery[Int] = SELECT(?(5)) FROM (i)
+    val query: SelectQuery[Int] = SELECT (?(5)) FROM i
 
     query.queryExpression should equal(
       """|SELECT ?
@@ -256,12 +259,12 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
   }
 
   it should "be able to select individual fields into tuples" in {
-    val query: SelectQuery[Tuple2[Long, String]] = SELECT(i.id, i.description) FROM (i)
+    val query: SelectQuery[Tuple2[Long, String]] = SELECT (i.id, i.description) FROM i
   }
 
   it should "be able to contain joins" in {
     val query: SelectQuery[Tuple2[Invoice, LineItem]] = (
-      SELECT(i.*, li.*)
+      SELECT (i.*, li.*)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
 
     query.queryExpression should equal(
@@ -279,7 +282,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
   it should "be able to contain joins with multiple conditions and negations" in {
     val query: SelectQuery[Tuple2[Invoice, LineItem]] = (
-      SELECT(i.*, li.*)
+      SELECT (i.*, li.*)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id && NOT(i.id <> ?(5000))))
 
     query.queryExpression should equal(
@@ -289,7 +292,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
   it should "be able to contain projections along with individual columns" in {
     val query: SelectQuery[Tuple2[Invoice, BigDecimal]] = (
-      SELECT(i.*, li.amount)
+      SELECT (i.*, li.amount)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
 
     query.queryExpression should equal(
@@ -311,7 +314,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
     val query = (
       SELECT DISTINCT (i.*, li.amount)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id)
-      WHERE (i.id == ?(1)))
+      WHERE i.id == ?(1))
 
     query.queryExpression should equal(
       """|SELECT DISTINCT i.id, i.description, i.image, li.amount
@@ -323,7 +326,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
     def buildQuery(invoiceId: Long) = (
       SELECT DISTINCT (i.*, li.amount)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id)
-      WHERE (i.id == ?(invoiceId)))
+      WHERE i.id == ?(invoiceId))
 
     buildQuery(1).queryExpression should equal(
       """|SELECT DISTINCT i.id, i.description, i.image, li.amount
@@ -345,7 +348,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
   it should "support aggregations" in {
     val query: SelectQuery[Tuple2[Long, BigDecimal]] = (
-      SELECT(i.id, MAX(li.amount))
+      SELECT (i.id, MAX(li.amount))
       FROM (i INNER_JOIN li ON i.id == li.invoice_id)
       GROUP_BY (i.id))
 
@@ -357,8 +360,8 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
   it should "support LIMIT and OFFSET clauses" in {
     val query: SelectQuery[Invoice] = (
-      SELECT(i.*)
-      FROM (i)
+      SELECT (i.*)
+      FROM i
       LIMIT ?(5)
       OFFSET ?(10))
 
@@ -373,9 +376,9 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
   it should "support the use of strings to plug in expressions for unsupported syntax" in {
     val query: SelectQuery[Invoice] = (
-      SELECT(i.*)
-      FROM (i)
-      WHERE (i.id == EXPR("(SELECT MAX(id) FROM line_item)")))
+      SELECT (i.*)
+      FROM i
+      WHERE i.id == EXPR("(SELECT MAX(id) FROM line_item)"))
 
     query.queryExpression should equal(
       """|SELECT i.id, i.description, i.image
@@ -386,11 +389,11 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
   }
 
   it should "support subqueries in the SELECT clause" in {
-    val subQuery: SelectQuery[Long] = SELECT(MAX(invoice.id)) FROM (invoice)
+    val subQuery: SelectQuery[Long] = SELECT (MAX(invoice.id)) FROM invoice
 
     val query: SelectQuery[Tuple2[Invoice, Long]] = (
-      SELECT(i.*, subQuery)
-      FROM (i))
+      SELECT (i.*, subQuery)
+      FROM i)
 
     query.queryExpression should equal("""|SELECT i.id, i.description, i.image, (SELECT MAX(invoice.id)
                                           |FROM invoice)
@@ -401,9 +404,9 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
   it should "support correlated subqueries in the WHERE clause" in {
     val query: SelectQuery[Invoice] = (
-      SELECT(i.*)
-      FROM (i)
-      WHERE i.id == (SELECT(MAX(invoice.id)) FROM (invoice) WHERE invoice.description == i.description))
+      SELECT (i.*)
+      FROM i
+      WHERE i.id == (SELECT (MAX(invoice.id)) FROM invoice WHERE invoice.description == i.description))
 
     query.queryExpression should equal("""|SELECT i.id, i.description, i.image
                                           |FROM invoice AS i
@@ -418,7 +421,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
     def findLineItemsForInvoice(invoiceId: Long) = (
       SELECT DISTINCT (i.*, li.*, MAX(li.amount) AS "the_max", FN("MIN")(li.amount), ?(5))
       FROM (i INNER_JOIN li ON i.id == li.invoice_id && i.id == li.invoice_id)
-      WHERE (i.id == ?(invoiceId) && NOT(i.id <> ?(5000)))
+      WHERE i.id == ?(invoiceId) && NOT(i.id <> ?(5000))
       ORDER_BY (i.id ASC, li.ts DESC)
       GROUP_BY (i.*, li.id, li.invoice_id, li.ts)
       LIMIT ?(3)
