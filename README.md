@@ -86,11 +86,11 @@ implicit val implicitConn = conn
 
 // Update the amount on all of our line items
 // Notice the use of ?() to bind the value 50
-UPDATE(line_item) SET (line_item.amount := ?(50)) go
+UPDATE (line_item) SET (line_item.amount := ?(50)) go
 
 // You can also do a whole object update if you want
 val updatedLineItem = LineItem(id = 1, invoice_id = 1, amount = 50)
-UPDATE(line_item) SET (updatedLineItem) go
+UPDATE (line_item) SET (updatedLineItem) go
 
 // Set up some aliases for our tables
 val i = invoice AS "i"
@@ -98,7 +98,7 @@ val li = line_item AS "li"
 val li2 = line_item AS "li2"
 
 // You can use correlated subqueries in your update (also in INSERT and SELECT)
-UPDATE(line_item) SET (line_item.amount := (SELECT (MAX(amount)) FROM li2 WHERE li2.id = line_item.id))
+UPDATE (line_item) SET (line_item.amount := (SELECT (MAX(amount)) FROM li2 WHERE li2.id = line_item.id))
 
 // Query for invoices with line items
 val selectQuery = (
