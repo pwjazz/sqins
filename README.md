@@ -95,6 +95,10 @@ UPDATE(line_item) SET (updatedLineItem) go
 // Set up some aliases for our tables
 val i = invoice AS "i"
 val li = line_item AS "li"
+val li2 = line_item AS "li2"
+
+// You can use correlated subqueries in your update (also in INSERT and SELECT)
+UPDATE(line_item) SET (line_item.amount := (SELECT (MAX(amount)) FROM li2 WHERE li2.id = line_item.id))
 
 // Query for invoices with line items
 val selectQuery = (
