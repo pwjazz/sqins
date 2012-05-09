@@ -38,12 +38,7 @@ case class Invoice(id: Long = -1,
 case class LineItem(id: Long = -1,
                     invoice_id: Long,
                     amount: BigDecimal,
-                    ts: Timestamp = new Timestamp(System.currentTimeMillis()) {
-  // Set up a query directly inside our object (ActiveRecord anyone?)
-  private val line_item = new LineItemTable()
-
-  def insert = INSERT INTO (line_item) VALUES (this)
-}
+                    ts: Timestamp = new Timestamp(System.currentTimeMillis())
 
 // Define our database tables
 // Tables have two type parameters, the row type and the primary key type
@@ -63,6 +58,9 @@ class LineItemTable extends Table[LineItem, Long]("line_item") {
 
   primaryKey(id)
   columns(id, invoice_id, amount, ts)
+  
+  // Set up a query directly inside our table
+  def insert(row: LineItem) = INSERT INTO (this) VALUES (row) go
 }
 
 // Set up names for our tables
@@ -80,7 +78,7 @@ val query = INSERT INTO invoice VALUES (newInvoice)
 val newInvoiceId:Option[Long] = query(conn) 
 newInvoiceId.map { id =>
   for (i <- 1 to 5) yield
-    LineItem(invoice_id = id, amount = i).insert(conn)
+    line_item.insert(LineItem(invoice_id = id, amount = i))
 }
 
 // Make the connection implicit so we don't have to keep using it explicitly
@@ -188,11 +186,9 @@ SELECT [ DISTINCT ] ]
 * All queries
     * Support for multi-column primary keys
     * Support for no primary keys (already there, but needs testing)
-    * Support for correlated subqueries in expressions
-    * Support for correlated subqueries in conditions 
+    * Support for correlated subqueries in from clause
     * Support for mapping to non-case classes???
 * INSERT queries
-    * Support for using a subquery in lieu of the VALUES clause
     * Support for DEFAULT column values in the VALUES clause    
 * SELECT queries
     * Support for UNION, INTERSECT and EXCEPT

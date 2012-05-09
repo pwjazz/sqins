@@ -140,6 +140,30 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       case None => fail("There should have been an invoice id")
     }
   }
+  
+  it should "also allow INSERT ... SELECT FROM semantics" in {
+    val query = (INSERT INTO invoice(invoice.description, invoice.image)
+            SELECT (invoice.description, invoice.image) FROM (invoice) WHERE (invoice.id == ?(-1)))
+    
+    query.insertExpression should equal("""|INSERT INTO invoice (description, image)
+                                          |SELECT invoice.description, invoice.image
+                                          |FROM invoice
+                                          |WHERE invoice.id = ?""".stripMargin)
+    
+    query(conn) should equal (0)
+  }
+  
+  it should "also allow INSERT ... SELECT FROM semantics using a predefined sub query" in {
+    val subQuery = SELECT (invoice.description, invoice.image) FROM (invoice) WHERE (invoice.id == ?(-1))
+    val query = (INSERT INTO invoice(invoice.description, invoice.image)) (subQuery)
+    
+    query.insertExpression should equal("""|INSERT INTO invoice (description, image)
+                                          |SELECT invoice.description, invoice.image
+                                          |FROM invoice
+                                          |WHERE invoice.id = ?""".stripMargin)
+    
+    query(conn) should equal (0)
+  }
 
   "An UPDATE statement" should "return the number of rows updated" in {
     val query = (
@@ -163,9 +187,24 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
     val query = UPDATE(li) SET (newLineItem)
 
-    query.expression should equal("""|UPDATE line_item AS li
+    query.updateExpression should equal("""|UPDATE line_item AS li
                                      |SET invoice_id = ?, amount = ?
                                      |WHERE li.id = ?""".stripMargin)
+    query(conn) should equal(1)
+  }
+  
+  it should "allow setting values to correlated subqueries" in {
+    val newLineItem = LineItem(id = 1, invoice_id = 1, amount = 56.78)
+
+    val li2 = line_item AS "li2"
+    
+    val query = UPDATE(li) SET (li.amount := (SELECT (MAX(li2.amount)) FROM li2 WHERE li2.id == li.id && li2.id <> ?(-1)))
+
+    query.updateExpression should equal("""|UPDATE line_item AS li
+                                           |SET amount = (SELECT MAX(li2.amount)
+                                           |FROM line_item AS li2
+                                           |WHERE li2.id = li.id AND li2.id <> ?)""".stripMargin) 
+    
     query(conn) should equal(1)
   }
 
@@ -193,7 +232,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
   "A SELECT statement" should "be able to return scalar values" in {
     val query: SelectQuery[Long] = SELECT(i.id) FROM (i)
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT i.id
            |FROM invoice AS i""".stripMargin)
   }
@@ -203,7 +242,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       SELECT(i.id)
       FROM (i))
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT i.id
            |FROM invoice AS i""".stripMargin)
   }
@@ -211,7 +250,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
   it should "be able to contain bound scalar values in the select clause" in {
     val query: SelectQuery[Int] = SELECT(?(5)) FROM (i)
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT ?
            |FROM invoice AS i""".stripMargin)
   }
@@ -225,7 +264,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       SELECT(i.*, li.*)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT i.id, i.description, i.image, li.id, li.invoice_id, li.amount, li.ts
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""".stripMargin)
 
@@ -243,7 +282,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       SELECT(i.*, li.*)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id && NOT(i.id <> ?(5000))))
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT i.id, i.description, i.image, li.id, li.invoice_id, li.amount, li.ts
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id AND NOT i.id <> ?""".stripMargin)
   }
@@ -253,7 +292,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       SELECT(i.*, li.amount)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT i.id, i.description, i.image, li.amount
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""".stripMargin)
   }
@@ -263,7 +302,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       SELECT DISTINCT (i.*, li.amount)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT DISTINCT i.id, i.description, i.image, li.amount
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""".stripMargin)
   }
@@ -274,7 +313,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       FROM (i INNER_JOIN li ON i.id == li.invoice_id)
       WHERE (i.id == ?(1)))
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT DISTINCT i.id, i.description, i.image, li.amount
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
            |WHERE i.id = ?""".stripMargin)
@@ -286,7 +325,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       FROM (i INNER_JOIN li ON i.id == li.invoice_id)
       WHERE (i.id == ?(invoiceId)))
 
-    buildQuery(1).expression should equal(
+    buildQuery(1).queryExpression should equal(
       """|SELECT DISTINCT i.id, i.description, i.image, li.amount
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
            |WHERE i.id = ?""".stripMargin)
@@ -298,7 +337,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       FROM (i INNER_JOIN li ON i.id == li.invoice_id)
       ORDER_BY (i.id, i.id ASC, li.amount DESC))
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT DISTINCT i.id, i.description, i.image, li.amount
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
            |ORDER BY i.id, i.id ASC, li.amount DESC""".stripMargin)
@@ -310,7 +349,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       FROM (i INNER_JOIN li ON i.id == li.invoice_id)
       GROUP_BY (i.id))
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT i.id, MAX(li.amount)
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id
            |GROUP BY i.id""".stripMargin)
@@ -323,7 +362,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       LIMIT ?(5)
       OFFSET ?(10))
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT i.id, i.description, i.image
            |FROM invoice AS i
            |LIMIT ?
@@ -338,14 +377,28 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       FROM (i)
       WHERE (i.id == EXPR("(SELECT MAX(id) FROM line_item)")))
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT i.id, i.description, i.image
            |FROM invoice AS i
            |WHERE i.id = (SELECT MAX(id) FROM line_item)""".stripMargin)
 
     query(conn).toList.length should equal(1)
   }
-
+  
+  it should "support subqueries in the select clause" in {
+    val subQuery: SelectQuery[Long] = SELECT(MAX(invoice.id)) FROM (invoice)
+    
+    val query: SelectQuery[Tuple2[Invoice, Long]] = (
+        SELECT (i.*, subQuery)
+        FROM (i))
+        
+    query.queryExpression should equal("""|SELECT i.id, i.description, i.image, (SELECT MAX(invoice.id)
+                                          |FROM invoice)
+                                          |FROM invoice AS i""".stripMargin)
+    
+    query(conn).toList.length should equal(1)
+  }
+  
   "A SELECT query" should "allows us to put together aggregations, wheres and all this other stuff and work correctly" in {
     def findLineItemsForInvoice(invoiceId: Long) = (
       SELECT DISTINCT (i.*, li.*, MAX(li.amount) AS "the_max", FN("MIN")(li.amount), ?(5))
@@ -358,7 +411,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
     val query = findLineItemsForInvoice(1)
 
-    query.expression should equal(
+    query.queryExpression should equal(
       """|SELECT DISTINCT i.id, i.description, i.image, li.id, li.invoice_id, li.amount, li.ts, MAX(li.amount) AS the_max, MIN(li.amount), ?
          |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id AND i.id = li.invoice_id
          |WHERE i.id = ? AND NOT i.id <> ?
@@ -402,7 +455,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
   "A DELETE query" should "support a WHERE clause" in {
     val query = DELETE FROM line_item WHERE line_item.id == ?(-50)
 
-    query.expression should equal(
+    query.deleteExpression should equal(
       """|DELETE FROM line_item
            |WHERE line_item.id = ?""".stripMargin)
 
@@ -412,7 +465,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
   it should "return the number of deleted rows" in {
     on(conn) { implicit c =>
       val query = DELETE FROM line_item
-      query.expression should equal("DELETE FROM line_item")
+      query.deleteExpression should equal("DELETE FROM line_item")
       query.go should equal(1)
     }
   }
