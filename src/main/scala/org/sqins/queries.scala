@@ -273,16 +273,16 @@ case class IncompleteInsertSelectQuery[T, T2](into: IntoItem[_, _], select: Extr
  * An INSERT INTO ... SELECT ... FROM query
  */
 case class InsertSelectQuery[T](into: IntoItem[_, _],
-                                 select: Extractable[T] with Expression,
-                                 distinct: Boolean,
-                                 from: FromItem,
-                                 where: Option[Condition] = None,
-                                 orderBy: Option[Expression] = None,
-                                 groupBy: Option[Expression] = None,
-                                 limit: Option[BoundValue[Long]] = None,
-                                 offset: Option[BoundValue[Long]] = None) extends BaseSelectQuery[T] {
+                                select: Extractable[T] with Expression,
+                                distinct: Boolean,
+                                from: FromItem,
+                                where: Option[Condition] = None,
+                                orderBy: Option[Expression] = None,
+                                groupBy: Option[Expression] = None,
+                                limit: Option[BoundValue[Long]] = None,
+                                offset: Option[BoundValue[Long]] = None) extends BaseSelectQuery[T] {
   def insertExpression = "INSERT INTO %1$s\n%2$s".format(into.intoExpression, this.queryExpression)
-  
+
   /**
    * Add a WHERE clause.
    */
@@ -307,7 +307,7 @@ case class InsertSelectQuery[T](into: IntoItem[_, _],
    * Add an OFFSET clause.
    */
   def OFFSET(offset: BoundValue[Long]) = copy(offset = Some(offset))
-  
+
   override def boundValues = select.boundValues ++ super.boundValues
 
   def apply(implicit conn: Connection): Int = {

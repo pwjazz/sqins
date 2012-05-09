@@ -140,29 +140,29 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
       case None => fail("There should have been an invoice id")
     }
   }
-  
+
   it should "also allow INSERT ... SELECT FROM semantics" in {
     val query = (INSERT INTO invoice(invoice.description, invoice.image)
-            SELECT (invoice.description, invoice.image) FROM (invoice) WHERE (invoice.id == ?(-1)))
-    
+      SELECT (invoice.description, invoice.image) FROM (invoice) WHERE (invoice.id == ?(-1)))
+
     query.insertExpression should equal("""|INSERT INTO invoice (description, image)
                                           |SELECT invoice.description, invoice.image
                                           |FROM invoice
                                           |WHERE invoice.id = ?""".stripMargin)
-    
-    query(conn) should equal (0)
+
+    query(conn) should equal(0)
   }
-  
+
   it should "also allow INSERT ... SELECT FROM semantics using a predefined sub query" in {
-    val subQuery = SELECT (invoice.description, invoice.image) FROM (invoice) WHERE (invoice.id == ?(-1))
-    val query = (INSERT INTO invoice(invoice.description, invoice.image)) (subQuery)
-    
+    val subQuery = SELECT(invoice.description, invoice.image) FROM (invoice) WHERE (invoice.id == ?(-1))
+    val query = (INSERT INTO invoice(invoice.description, invoice.image))(subQuery)
+
     query.insertExpression should equal("""|INSERT INTO invoice (description, image)
                                           |SELECT invoice.description, invoice.image
                                           |FROM invoice
                                           |WHERE invoice.id = ?""".stripMargin)
-    
-    query(conn) should equal (0)
+
+    query(conn) should equal(0)
   }
 
   "An UPDATE statement" should "return the number of rows updated" in {
@@ -192,19 +192,19 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
                                      |WHERE li.id = ?""".stripMargin)
     query(conn) should equal(1)
   }
-  
+
   it should "allow setting values to correlated subqueries" in {
     val newLineItem = LineItem(id = 1, invoice_id = 1, amount = 56.78)
 
     val li2 = line_item AS "li2"
-    
-    val query = UPDATE(li) SET (li.amount := (SELECT (MAX(li2.amount)) FROM li2 WHERE li2.id == li.id && li2.id <> ?(-1)))
+
+    val query = UPDATE(li) SET (li.amount := (SELECT(MAX(li2.amount)) FROM li2 WHERE li2.id == li.id && li2.id <> ?(-1)))
 
     query.updateExpression should equal("""|UPDATE line_item AS li
                                            |SET amount = (SELECT MAX(li2.amount)
                                            |FROM line_item AS li2
-                                           |WHERE li2.id = li.id AND li2.id <> ?)""".stripMargin) 
-    
+                                           |WHERE li2.id = li.id AND li2.id <> ?)""".stripMargin)
+
     query(conn) should equal(1)
   }
 
@@ -384,21 +384,36 @@ class CoreSpec extends FlatSpec with ShouldMatchers with DBTest {
 
     query(conn).toList.length should equal(1)
   }
-  
-  it should "support subqueries in the select clause" in {
+
+  it should "support subqueries in the SELECT clause" in {
     val subQuery: SelectQuery[Long] = SELECT(MAX(invoice.id)) FROM (invoice)
-    
+
     val query: SelectQuery[Tuple2[Invoice, Long]] = (
-        SELECT (i.*, subQuery)
-        FROM (i))
-        
+      SELECT(i.*, subQuery)
+      FROM (i))
+
     query.queryExpression should equal("""|SELECT i.id, i.description, i.image, (SELECT MAX(invoice.id)
                                           |FROM invoice)
                                           |FROM invoice AS i""".stripMargin)
-    
+
     query(conn).toList.length should equal(1)
   }
-  
+
+  it should "support correlated subqueries in the WHERE clause" in {
+    val query: SelectQuery[Invoice] = (
+      SELECT(i.*)
+      FROM (i)
+      WHERE i.id == (SELECT(MAX(invoice.id)) FROM (invoice) WHERE invoice.description == i.description))
+
+    query.queryExpression should equal("""|SELECT i.id, i.description, i.image
+                                          |FROM invoice AS i
+                                          |WHERE i.id = (SELECT MAX(invoice.id)
+                                          |FROM invoice
+                                          |WHERE invoice.description = i.description)""".stripMargin)
+
+    query(conn).toList.length should equal(1)
+  }
+
   "A SELECT query" should "allows us to put together aggregations, wheres and all this other stuff and work correctly" in {
     def findLineItemsForInvoice(invoiceId: Long) = (
       SELECT DISTINCT (i.*, li.*, MAX(li.amount) AS "the_max", FN("MIN")(li.amount), ?(5))
