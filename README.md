@@ -185,12 +185,18 @@ SELECT [ DISTINCT ] ]
 
 * Documentation
     * Create user guide
+    * Include survey of other options (ScalaQuery, CircumflexORM, Squeryl)
+    * Improve consistency of parentheses and explain their use
     * Clean up class and method visibility
     * Generate scaladoc
 * All queries
+    * Provide nicer error messages by using @implicitNotFound
+    * Provide operator similar to ScalaQuery ? to turn columns from an outer join into Option values
     * Support for multi-column primary keys
     * Support for no primary keys (already there, but needs testing)
     * Support for correlated subqueries in from clause
+    * Indentation in query output for better readability
+    * Support for type-casting functions???
     * Support for mapping to non-case classes???
 * INSERT queries
     * Support for DEFAULT column values in the VALUES clause    
