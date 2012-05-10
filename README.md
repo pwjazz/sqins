@@ -307,6 +307,7 @@ INSERT INTO table [(column [, ...])]
   VALUES ({ bound_value [, ...] | row_object }) |
   a SELECT query
 }
+```
 
 An UPDATE query is:
 ```
