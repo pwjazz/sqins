@@ -286,7 +286,56 @@ singleton object, it doesn't cost much and it's very convenient.
 
 ## SELECT Queries
 
-TODO
+### Grammar
+
+A SELECT query is:
+```
+SELECT [DISTINCT] (extractable_expression)
+FROM (from_item)
+[WHERE (condition)]
+[ORDER_BY (expression)]
+[GROUP_BY (expression)]
+[LIMIT bound_value]    - database-specific
+[OFFSET bound_value]   - database-specific
+```
+where extractable_expression is:
+```
+extractable_scalar [, ...]
+```
+where extractable_scalar is:
+```
+{ scalar_value | another SELECT query }
+```
+where scalar_value is:
+```
+{ column | projection | function_call | bound_value }
+```
+where projection is:
+```
+table.*
+```
+where from_item is:
+```
+table [INNER_JOIN table ON condition ...]
+```
+where condition is:
+```
+(scalar_expression { { IS_NULL | IS_NOT_NULL } | ({ == | <> | != | > | < } scalar_expression) }) [{ && | || } condition ...]
+```
+where scalar_expression is:
+```
+{ scalar_value [ ASC | DESC ] | EXPR("arbitrary SQL") }
+```
+where expression is:
+```
+scalar_expression [, ...]
+```
+where bound_value is:
+```
+?(any value from your code, like a variable or a constant expression)
+```
+
+
 
 ## INSERT Queries
 
@@ -315,7 +364,6 @@ TODO
 * All queries
     * Add these keywords: LIKE, ILIKE, IN, EXISTS
     * Provide nicer error messages by using @implicitNotFound
-    * Provide operator similar to ScalaQuery ? to turn columns from an outer join into Option values
     * Support for multi-column primary keys
     * Support for no primary keys (already there, but needs testing)
     * Support for correlated subqueries in from clause
@@ -325,6 +373,7 @@ TODO
 * INSERT queries
     * Support for DEFAULT column values in the VALUES clause    
 * SELECT queries
+    * Support for left and right outer joins (includes operator similar to ScalaQuery ? to turn columns from an outer join into Option values)
     * Support for UNION, INTERSECT and EXCEPT
 * Database Support
     * MySQL
