@@ -1,5 +1,5 @@
 sqins - (s)tructured (q)ueries (in) (S)cala
-===========================================
+-------------------------------------------
 
 sqins provides type-safe SQL INSERT, UPDATE, DELETE and SELECT statements inside Scala.  sqins makes 80% of typical DML
 really easy and stays out of the way for the other 20%.
