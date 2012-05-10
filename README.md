@@ -284,9 +284,10 @@ that, don't use `inTransaction()`.
 * It's a good idea to go ahead and define several aliases for the same table in case you need them.  Since `db` is a
 singleton object, it doesn't cost much and it's very convenient.
 
-## SELECT Queries
+## Grammar
 
-### Grammar
+This section describes the full grammar of sqins.  If you want some lighter reading, skip ahead to start learning about
+[INSERT queries](#INSERT). 
 
 A SELECT query is:
 ```
@@ -297,6 +298,47 @@ FROM (from_item)
 [GROUP_BY (expression)]
 [LIMIT bound_value]    - database-specific
 [OFFSET bound_value]   - database-specific
+```
+
+An INSERT query is:
+```
+INSERT INTO table [(column [, ...])]
+{
+  VALUES ({ bound_value [, ...] | row_object }) |
+  a SELECT query
+}
+
+An UPDATE query is:
+```
+UPDATE (table)
+SET ({ expression | row_object })
+[WHERE (condition)]
+```
+
+A DELETE query is
+```
+DELETE FROM table
+[WHERE (condition)]
+```
+
+A pure SQL query is
+```
+SQL("a sql string")
+```
+
+where expression is:
+```
+{ scalar_expression | set_expression } [, ...]
+```
+
+where scalar_expression is:
+```
+{ scalar_value [ ASC | DESC ] | EXPR("arbitrary SQL") }
+```
+
+where set_expression is:
+```
+scalar_expression := scalar_value
 ```
 
 where extractable_expression is:
@@ -313,34 +355,47 @@ where scalar_value is:
 ```
 { column | projection | function_call | bound_value }
 ```
+
+where function_call is:
+```
+{ predefined_function | FN("function name") } (
+
 where projection is:
 ```
 table.*
 ```
-where from_item is:
-```
-table [INNER_JOIN table ON condition ...]
-```
-where condition is:
-```
-(scalar_expression { { IS_NULL | IS_NOT_NULL } | ({ == | <> | != | > | < } scalar_expression) }) [{ && | || } condition ...]
-```
-where scalar_expression is:
-```
-{ scalar_value [ ASC | DESC ] | EXPR("arbitrary SQL") }
-```
-where expression is:
-```
-scalar_expression [, ...]
-```
+
 where bound_value is:
 ```
 ?(any value from your code, like a variable or a constant expression)
 ```
 
+where row_object is:
+```
+An instance of a case class representing a row from the table being inserted/updated
+```
 
+where from_item is:
+```
+table [INNER_JOIN table ON condition ...]
+```
 
-## INSERT Queries
+where condition is:
+```
+{ unary_condition | binary_condition } [{ && | || } condition]
+```
+
+where unary_condition is:
+```
+scalar_expression { IS_NULL | IS_NOT_NULL }
+```
+
+where binary_condition is:
+```
+scalar_expression { == | <> | != | > | < } scalar_expression }
+```
+
+<a id="INSERT">## INSERT Queries</a>
 
 TODO
 
@@ -378,6 +433,8 @@ TODO
 * SELECT queries
     * Support for left and right outer joins (includes operator similar to ScalaQuery ? to turn columns from an outer join into Option values)
     * Support for UNION, INTERSECT and EXCEPT
+* UPDATE queries
+    * Tighten up type checking for the SET expression (right now, it's just any expression)
 * Database Support
     * MySQL
     * Oracle

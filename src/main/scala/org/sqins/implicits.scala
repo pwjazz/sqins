@@ -112,7 +112,7 @@ object Implicits {
   implicit val OptionByteArrayTypeMapping = new OptionTypeMapping(ByteArrayTypeMapping)
 
   // Allow Aliases to be treated as whatever was aliased
-  implicit def aliasToAliased[T, E <: Value[T]](alias: Alias[T, E]) = alias.aliased
+  implicit def aliasToAliased[T, E <: ScalarValue[T]](alias: Alias[T, E]) = alias.aliased
   
   // Treat an InsertValuesQuery as its result
   implicit def insertValuesQueryToResult[K](query: InsertValuesQuery[_, K])(implicit conn: Connection) = query(conn)

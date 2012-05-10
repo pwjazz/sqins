@@ -179,7 +179,7 @@ case class SelectQuery[T](select: Extractable[T] with Expression,
                           orderBy: Option[Expression] = None,
                           groupBy: Option[Expression] = None,
                           limit: Option[BoundValue[Long]] = None,
-                          offset: Option[BoundValue[Long]] = None) extends BaseSelectQuery[T] with Value[T] {
+                          offset: Option[BoundValue[Long]] = None) extends BaseSelectQuery[T] with ScalarValue[T] {
 
   /**
    * Add a WHERE clause.
