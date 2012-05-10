@@ -64,7 +64,7 @@ db.withConnection { implicit conn: Connection =>
  * Smart performance - sqins employs common-sense optimizations like using PreparedStatements, streaming results from cursors, etc.
  * No SQL-injection - by using PreparedStatements and bound parameters, sqins keeps you out of SQL injection trouble.
  * Works with PostgreSQL - other databases are on the way.
- * Runs in your container - sqins doesn't manage its own database connections or transactions, so it plays nice with any container or even no container.
+ * Runs in your container - sqins doesn't care where you get your connections, so it works equally well in containerless and in-container apps.
 
 ## Installation
 
