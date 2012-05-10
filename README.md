@@ -29,8 +29,10 @@ val li = new LineItemTable() AS "li"
 
 db.inTransaction { implicit conn: Connection =>
   INSERT INTO i(i.description) VALUES (?("A new invoice")) map { invoiceId =>
-    val newLineItem = LineItem(invoice_id = invoiceId, amount = 25)
-    INSERT INTO li VALUES (newLineItem) go
+    for (i <- 1 to 5) {
+      val newLineItem = LineItem(invoice_id = invoiceId, amount = 5 * i)
+      INSERT INTO li VALUES (newLineItem) go
+    }
   }
 }
 
