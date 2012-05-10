@@ -395,7 +395,7 @@ where binary_condition is:
 scalar_expression { == | <> | != | > | < } scalar_expression }
 ```
 
-<a id="INSERT">## INSERT Queries</a>
+## <a name="INSERT">INSERT Queries</a>
 
 TODO
 
