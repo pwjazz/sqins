@@ -30,7 +30,7 @@ really easy and stays out of the way for the other 20%.
 
 ## Imports
 
-You'll typically want these 3 imports
+You'll typically use these 3 imports.
 
 ````scala
 import java.sql._
@@ -38,17 +38,48 @@ import org.sqins._
 import org.sqins.Implicits._
 ````
 
-### 
-// Define our Scala model (needs to be case classes)
-case class Invoice(id: Long = -1,
-                   description: String,
+## Mapping
+
+Let's assume the following schema
+
+````sql
+DROP TABLE IF EXISTS line_item;
+DROP TABLE IF EXISTS invoice;
+
+create table invoice (
+  id SERIAL,
+  description VARCHAR(255),
+  image BYTEA,
+  primary key(id));
+
+create table line_item (
+  id SERIAL,
+  invoice_id BIGINT,
+  amount DECIMAL(22,2),
+  ts TIMESTAMP DEFAULT NOW(),
+  primary key(id)); 
+
+alter table line_item add constraint fk_line_item_invoice  foreign key (invoice_id) references invoice(id);
+````
+
+sqins expects case classes to represent rows (or entities if you prefer that term).
+
+````scala
+case class Invoice(description: String,
+                   id: Long = -1,
                    image: Option[Array[Byte]] = None)
 
-case class LineItem(id: Long = -1,
-                    invoice_id: Long,
+case class LineItem(invoice_id: Long,
                     amount: BigDecimal,
+                    id: Long = -1,
                     ts: Timestamp = new Timestamp(System.currentTimeMillis())
+````                    
 
+A few things to note:
+
+* These classes have no references to sqins - they're plain case classes.
+* Notice that some parameters have default values.  These happen to correspond to columns that we will You'll find that it's handy 
+You define mappings from your case cl
 // Define our database tables
 // Tables have two type parameters, the row type and the primary key type
 class InvoiceTable extends Table[Invoice, Long]("invoice") {
