@@ -10,7 +10,7 @@ really easy and stays out of the way for the other 20%.
 
 **Author** - Percy Wegmann
 
-## This is valid sqins
+### This is valid sqins
 
 ````scala
 case class Invoice(id: Long = -1,
