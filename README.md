@@ -84,7 +84,7 @@ import org.sqins.Implicits._
 
 ### Example Database Schema
 
-This is SQL (not sqins).
+This is SQL, not Scala.
 
 ````sql
 DROP TABLE IF EXISTS line_item;
