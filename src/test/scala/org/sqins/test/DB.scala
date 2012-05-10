@@ -59,14 +59,14 @@ object db extends Database {
         
         create table invoice (
           id SERIAL,
-          description VARCHAR(255),
+          description VARCHAR(255) NOT NULL,
           image BYTEA,
           primary key(id));
         
         create table line_item (
           id SERIAL,
-          invoice_id BIGINT,
-          amount DECIMAL(22,2),
+          invoice_id BIGINT NOT NULL,
+          amount DECIMAL(22,2) NOT NULL,
           ts TIMESTAMP DEFAULT NOW(),
           primary key(id)); 
         

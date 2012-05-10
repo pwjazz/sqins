@@ -39,64 +39,76 @@ import java.sql.Connection
  */
 object Implicits {
   // Type mappings
-  implicit val ByteTypeMapping = new TypeMapping[Byte](
-    _get = (rs: ResultSet, position: Int) => Extraction(rs.getByte(position), 1),
-    _set = (ps: PreparedStatement, position: Int, value: Byte) => ps.setByte(position, value))
+  implicit object ByteTypeMapping extends TypeMapping[Byte] {
+    def _get(rs: ResultSet, position: Int) = Extraction(rs.getByte(position), 1)
+    def _set(ps: PreparedStatement, position: Int, value: Byte) = ps.setByte(position, value)
+  }
   implicit val OptionByteTypeMapping = new OptionTypeMapping(ByteTypeMapping)
 
-  implicit val ShortTypeMapping = new TypeMapping[Short](
-    _get = (rs: ResultSet, position: Int) => Extraction(rs.getShort(position), 1),
-    _set = (ps: PreparedStatement, position: Int, value: Short) => ps.setShort(position, value))
+  implicit object ShortTypeMapping extends TypeMapping[Short] {
+    def _get(rs: ResultSet, position: Int) = Extraction(rs.getShort(position), 1)
+    def _set(ps: PreparedStatement, position: Int, value: Short) = ps.setShort(position, value)
+  }
   implicit val OptionShortTypeMapping = new OptionTypeMapping(ShortTypeMapping)
 
-  implicit val IntTypeMapping = new TypeMapping[Int](
-    _get = (rs: ResultSet, position: Int) => Extraction(rs.getInt(position), 1),
-    _set = (ps: PreparedStatement, position: Int, value: Int) => ps.setInt(position, value))
+  implicit object IntTypeMapping extends TypeMapping[Int] {
+    def _get(rs: ResultSet, position: Int) = Extraction(rs.getInt(position), 1)
+    def _set(ps: PreparedStatement, position: Int, value: Int) = ps.setInt(position, value)
+  }
   implicit val OptionIntTypeMapping = new OptionTypeMapping(IntTypeMapping)
 
-  implicit val LongTypeMapping = new TypeMapping[Long](
-    _get = (rs: ResultSet, position: Int) => Extraction(rs.getLong(position), 1),
-    _set = (ps: PreparedStatement, position: Int, value: Long) => ps.setLong(position, value))
+  implicit object LongTypeMapping extends TypeMapping[Long] {
+    def _get(rs: ResultSet, position: Int) = Extraction(rs.getLong(position), 1)
+    def _set(ps: PreparedStatement, position: Int, value: Long) = ps.setLong(position, value)
+  }
   implicit val OptionLongTypeMapping = new OptionTypeMapping(LongTypeMapping)
 
-  implicit val FloatTypeMapping = new TypeMapping[Float](
-    _get = (rs: ResultSet, position: Int) => Extraction(rs.getFloat(position), 1),
-    _set = (ps: PreparedStatement, position: Int, value: Float) => ps.setFloat(position, value))
+  implicit object FloatTypeMapping extends TypeMapping[Float] {
+    def _get(rs: ResultSet, position: Int) = Extraction(rs.getFloat(position), 1)
+    def _set(ps: PreparedStatement, position: Int, value: Float) = ps.setFloat(position, value)
+  }
   implicit val OptionFloatTypeMapping = new OptionTypeMapping(FloatTypeMapping)
 
-  implicit val DoubleTypeMapping = new TypeMapping[Double](
-    _get = (rs: ResultSet, position: Int) => Extraction(rs.getDouble(position), 1),
-    _set = (ps: PreparedStatement, position: Int, value: Double) => ps.setDouble(position, value))
+  implicit object DoubleTypeMapping extends TypeMapping[Double] {
+    def _get(rs: ResultSet, position: Int) = Extraction(rs.getDouble(position), 1)
+    def _set(ps: PreparedStatement, position: Int, value: Double) = ps.setDouble(position, value)
+  }
   implicit val OptionDoubleTypeMapping = new OptionTypeMapping(DoubleTypeMapping)
 
-  implicit val BooleanTypeMapping = new TypeMapping[Boolean](
-    _get = (rs: ResultSet, position: Int) => Extraction(rs.getBoolean(position), 1),
-    _set = (ps: PreparedStatement, position: Int, value: Boolean) => ps.setBoolean(position, value))
+  implicit object BooleanTypeMapping extends TypeMapping[Boolean] {
+    def _get(rs: ResultSet, position: Int) = Extraction(rs.getBoolean(position), 1)
+    def _set(ps: PreparedStatement, position: Int, value: Boolean) = ps.setBoolean(position, value)
+  }
   implicit val OptionBooleanTypeMapping = new OptionTypeMapping(BooleanTypeMapping)
 
-  implicit val StringTypeMapping = new TypeMapping[String](
-    _get = (rs: ResultSet, position: Int) => Extraction(rs.getString(position), 1),
-    _set = (ps: PreparedStatement, position: Int, value: String) => ps.setString(position, value))
+  implicit object StringTypeMapping extends TypeMapping[String] {
+    def _get(rs: ResultSet, position: Int) = Extraction(rs.getString(position), 1)
+    def _set(ps: PreparedStatement, position: Int, value: String) = ps.setString(position, value)
+  }
   implicit val OptionStringTypeMapping = new OptionTypeMapping(StringTypeMapping)
 
-  implicit val BigDecimalTypeMapping = new TypeMapping[BigDecimal](
-    _get = (rs: ResultSet, position: Int) => Extraction(BigDecimal(rs.getBigDecimal(position)), 1),
-    _set = (ps: PreparedStatement, position: Int, value: BigDecimal) => ps.setBigDecimal(position, java.math.BigDecimal.valueOf(value.doubleValue())))
+  implicit object BigDecimalTypeMapping extends TypeMapping[BigDecimal] {
+    def _get(rs: ResultSet, position: Int) = Extraction(BigDecimal(rs.getBigDecimal(position)), 1)
+    def _set(ps: PreparedStatement, position: Int, value: BigDecimal) = ps.setBigDecimal(position, java.math.BigDecimal.valueOf(value.doubleValue()))
+  }
   implicit val OptionBigDecimalTypeMapping = new OptionTypeMapping(BigDecimalTypeMapping)
 
-  implicit val DateTypeMapping = new TypeMapping[Date](
-    _get = (rs: ResultSet, position: Int) => Extraction(rs.getDate(position), 1),
-    _set = (ps: PreparedStatement, position: Int, value: Date) => ps.setDate(position, value))
+  implicit object DateTypeMapping extends TypeMapping[Date] {
+    def _get(rs: ResultSet, position: Int) = Extraction(rs.getDate(position), 1)
+    def _set(ps: PreparedStatement, position: Int, value: Date) = ps.setDate(position, value)
+  }
   implicit val OptionDateTypeMapping = new OptionTypeMapping(DateTypeMapping)
 
-  implicit val TimestampTypeMapping = new TypeMapping[Timestamp](
-    _get = (rs: ResultSet, position: Int) => Extraction(rs.getTimestamp(position), 1),
-    _set = (ps: PreparedStatement, position: Int, value: Timestamp) => ps.setTimestamp(position, value))
+  implicit object TimestampTypeMapping extends TypeMapping[Timestamp] {
+    def _get(rs: ResultSet, position: Int) = Extraction(rs.getTimestamp(position), 1)
+    def _set(ps: PreparedStatement, position: Int, value: Timestamp) = ps.setTimestamp(position, value)
+  }
   implicit val OptionTimestampTypeMapping = new OptionTypeMapping(TimestampTypeMapping)
   
-  implicit val ByteArrayTypeMapping = new TypeMapping[Array[Byte]](
-    _get = (rs: ResultSet, position: Int) => Extraction(rs.getBytes(position), 1),
-    _set = (ps: PreparedStatement, position: Int, value: Array[Byte]) => ps.setBytes(position, value))
+  implicit object ByteArrayTypeMapping extends TypeMapping[Array[Byte]] {
+    def _get(rs: ResultSet, position: Int) = Extraction(rs.getBytes(position), 1)
+    def _set(ps: PreparedStatement, position: Int, value: Array[Byte]) = ps.setBytes(position, value)
+  }
   implicit val OptionByteArrayTypeMapping = new OptionTypeMapping(ByteArrayTypeMapping)
 
   // Allow Aliases to be treated as whatever was aliased

@@ -487,9 +487,11 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
 
     // Let's define our own type mapping for MyType
     object MyTypeMappings {
-      implicit val MyTypeMapping = new TypeMapping[MyType](
-        _get = (rs: ResultSet, position: Int) => Extraction(MyType(rs.getString(position)), 1),
-        _set = (ps: PreparedStatement, position: Int, value: MyType) => ps.setString(position, value.wrapped))
+      implicit object MyTypeMapping extends TypeMapping[MyType] {
+        def _get(rs: ResultSet, position: Int) = Extraction(MyType(rs.getString(position)), 1)
+        
+        def _set(ps: PreparedStatement, position: Int, value: MyType) = ps.setString(position, value.wrapped)
+      }
 
       // Option types require their own type mapping, so let's define that as well
       implicit val OptionMyTypeMapping = new OptionTypeMapping(MyTypeMapping)
