@@ -213,130 +213,27 @@ connection and give it to the Database.  For server applications, it's always a 
 * The Database class does transaction management on the database connection.  If you're using JTA or something like that,
 don't use inTransaction().
 
+## SELECT Queries
 
+TODO
 
+## INSERT Queries
 
+TODO
 
+## UPDATE Queries
 
-// Set up names for our tables
-val invoice = new InvoiceTable()
-val line_item = new LineItemTable()
+TODO
 
-// Get a Connection
-val conn: Connection = getConnection // get a connection however you like
+## DELETE Queries
 
-// Set up some queries
-val newInvoice = Invoice(description = "An invoice")
-val query = INSERT INTO invoice VALUES (newInvoice)
+TODO
 
-// Insert an invoice and some line items 
-val newInvoiceId:Option[Long] = query(conn) 
-newInvoiceId.map { id =>
-  for (i <- 1 to 5) yield
-    line_item.insert(LineItem(invoice_id = id, amount = i))
-}
+## Pure SQL Queries
 
-// Make the connection implicit so we don't have to keep using it explicitly
-implicit val implicitConn = conn
+TODO
 
-// Update the amount on all of our line items
-// Notice the use of ?() to bind the value 50
-UPDATE (line_item) SET (line_item.amount := ?(50)) go
-
-// You can also do a whole object update if you want
-val updatedLineItem = LineItem(id = 1, invoice_id = 1, amount = 50)
-UPDATE (line_item) SET (updatedLineItem) go
-
-// Set up some aliases for our tables
-val i = invoice AS "i"
-val li = line_item AS "li"
-val li2 = line_item AS "li2"
-
-// You can use correlated subqueries in your update (also in INSERT and SELECT)
-UPDATE (line_item) SET (line_item.amount := (SELECT (MAX(amount)) FROM li2 WHERE li2.id = line_item.id))
-
-// Query for invoices with line items
-val selectQuery = (
-  SELECT (i.*, li.*)
-  FROM (i INNER_JOIN li ON i.id == li.invoice_id)
-  ORDER_BY (i.id, li.ts DESC))
-  
-// Print out our query expression just to see what it looks like
-println(selectQuery.expression)
-
-// Run the query
-val selectResult = selectQuery go
-
-// Iterate through the results and print the info
-selectResult.foreach(row => {
-  println("Invoice Id: " + row._1.id)
-  println("Invoice Description: " + row._1.description)
-  println("Line Item Id: " + row._2.id)
-  println("Line Item Amount: " + row._2.amount)
-  println("Line Item Timestamp: " + row._2.ts)
-})
-
-// Use FN([string]) for your database's functions
-val queryWithFunctions = (
-  SELECT (i.*, FN("my_function")(li.amount))
-  FROM (i INNER_JOIN li ON i.id == li.invoice_id))
-
-// Use EXPR([string]) to plug in scalar expressions not natively supported by sqins
-val complicatedSelectQuery = (
-  SELECT (i.*, li.*)
-  FROM (i INNER_JOIN li ON i.id == li.invoice_id)
-  WHERE i.id == EXPR("(SELECT MAX(invoice_id) FROM line_item)")
-  ORDER_BY (i.id, li.ts DESC))
-  
-// Delete the line items and then the invoice
-DELETE FROM li go;
-DELETE FROM i go
-
-// You can also run arbitrary SQL like this
-SQL("""put some really complicated sql in here""")(conn)
-````
-
-For an extended example, take a look at [core_tests.scala](sqins/blob/master/src/test/scala/org/sqins/core_tests.scala).
-
-### Supported SQL Features
-
-#### INSERT queries
-
-````
-INSERT INTO table [ ( column [, ...] ) ]
-    VALUES ( expression [, ...] )
-````
-
-#### UPDATE queries
-
-````
-UPDATE table [ [ AS ] alias ]
-    SET {{ column = expression } [,...] | row }
-          ( column [, ...] ) = ( { expression | DEFAULT } [, ...] ) } [, ...]
-````
-
-#### DELETE queries
-
-````
-DELETE FROM table [ [ AS ] alias ]
-    [ WHERE condition ]
-````
-
-#### SELECT queries
-
-````
-SELECT [ DISTINCT ] ]
-    * | expression [ [ AS ] output_name ] [, ...]
-    [ FROM from_item [, ...] ]
-    [ WHERE condition ]
-    [ GROUP BY expression [, ...] ]
-    [ HAVING condition [, ...] ]
-    [ ORDER BY expression [ ASC | DESC ] [, ...] ]
-    [ LIMIT { count } ]
-    [ OFFSET start [ ROW ] ]
-````
-
-### Roadmap
+## Roadmap
 
 * Documentation
     * Create user guide
