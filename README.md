@@ -84,6 +84,8 @@ import org.sqins.Implicits._
 
 ### Example Database Schema
 
+This is SQL (not sqins).
+
 ````sql
 DROP TABLE IF EXISTS line_item;
 DROP TABLE IF EXISTS invoice;
