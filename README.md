@@ -10,20 +10,7 @@ really easy and stays out of the way for the other 20%.
 
 **Author** - Percy Wegmann
 
-## Benefits
-
- * Looks like SQL - if you know SQL, you pretty much know sqins.
- * Strongly typed - compile time checking for SQL syntax and column types.
- * Not an ORM - sqins is just a SQL API.
- * Simple mapping - unlike an ORM, sqins just needs to know the most basic things about your tables and columns.
- * Extensible scalar types - sqins comes with support for basic types like numbers, strings and dates and makes it super-easy to define new type mappings.
- * Side-effect free - sqins doesn't cache data, maintain identity or relationships or do any other ORM funkiness.  This makes it easier to use, and makes it usable in idiomatic Scala. 
- * Smart performance - sqins employs common-sense optimizations like using PreparedStatements, streaming results from cursors, etc.
- * No SQL-injection - because sqins uses PreparedStatements and bound parameters, sqins makes it hard (though not impossible) to introduce SQL-injection vulnerabilities.
- * Works with PostgreSQL - other databases are on the way.
- * Runs in your container - sqins doesn't manage its own database connections or transactions, so it plays nice with any container or even no container.
-
-### This is valid sqins
+## This is valid sqins
 
 ````scala
 case class Invoice(id: Long = -1,
@@ -62,6 +49,19 @@ db.withConnection { implicit conn: Connection =>
     }
 }
 ````
+
+## Benefits
+
+ * Looks like SQL - if you know SQL, you pretty much know sqins.
+ * Strongly typed - compile time checking for SQL syntax and column types.
+ * Not an ORM - sqins is just a SQL API.
+ * Simple mapping - unlike an ORM, sqins just needs to know the most basic things about your tables and columns.
+ * Extensible scalar types - sqins comes with support for basic types like numbers, strings and dates and makes it super-easy to define new type mappings.
+ * Side-effect free - sqins doesn't cache data, maintain identity or relationships or do any other ORM funkiness.  This makes it easier to use, and makes it usable in idiomatic Scala. 
+ * Smart performance - sqins employs common-sense optimizations like using PreparedStatements, streaming results from cursors, etc.
+ * No SQL-injection - because sqins uses PreparedStatements and bound parameters, sqins makes it hard (though not impossible) to introduce SQL-injection vulnerabilities.
+ * Works with PostgreSQL - other databases are on the way.
+ * Runs in your container - sqins doesn't manage its own database connections or transactions, so it plays nice with any container or even no container.
 
 ## Installation
 
