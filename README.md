@@ -62,7 +62,7 @@ db.withConnection { implicit conn: Connection =>
  * Extensible scalar types - sqins comes with support for basic types like numbers, strings and dates and makes it super-easy to define new type mappings.
  * Side-effect free - sqins doesn't cache data, maintain identity or relationships or do any other ORM funkiness.  This makes it easier to use, and makes it usable in idiomatic Scala. 
  * Smart performance - sqins employs common-sense optimizations like using PreparedStatements, streaming results from cursors, etc.
- * No SQL-injection - because sqins uses PreparedStatements and bound parameters, sqins makes it hard (though not impossible) to introduce SQL-injection vulnerabilities.
+ * No SQL-injection - by using PreparedStatements and bound parameters, sqins keeps you out of SQL injection trouble.
  * Works with PostgreSQL - other databases are on the way.
  * Runs in your container - sqins doesn't manage its own database connections or transactions, so it plays nice with any container or even no container.
 
