@@ -324,7 +324,7 @@ A pure SQL query is
 SQL("a sql string")
 ```
 
-where expression is:
+where *expression* is:
 ```
 { scalar_expression | set_expression } [, ...]
 ```
