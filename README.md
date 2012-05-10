@@ -35,18 +35,18 @@ db.inTransaction { implicit conn: Connection =>
 
 db.withConnection { implicit conn: Connection =>
   val query = (
-    SELECT(i.*, li.*)
+    SELECT (i.*, li.*)
     FROM (i INNER_JOIN li ON i.id == li.invoice_id)
     WHERE (i.description == ?("A new invoice")))
     
   query foreach { row =>
-        println(row._1.id)
-        println(row._1.description)
-        println(row._2.id)
-        println(row._2.invoice_id)
-        println(row._2.amount)
-        println(row._2.ts)
-    }
+    println(row._1.id)
+    println(row._1.description)
+    println(row._2.id)
+    println(row._2.invoice_id)
+    println(row._2.amount)
+    println(row._2.ts)
+  }
 }
 ````
 
