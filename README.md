@@ -27,7 +27,7 @@ case class LineItem(id: Long = -1,
 val i = new InvoiceTable() AS "i"
 val li = new LineItemTable() AS "li"
 
-db.inTransaction { implicit conn: Connection =>
+db.inTransaction { implicit conn =>
   INSERT INTO i(i.description) VALUES (?("A new invoice")) map { invoiceId =>
     for (i <- 1 to 5) {
       val newLineItem = LineItem(invoice_id = invoiceId, amount = 5 * i)
@@ -287,7 +287,7 @@ singleton object, it doesn't cost much and it's very convenient.
 ## Grammar
 
 This section describes the full grammar of sqins.  If you want some lighter reading, skip ahead to start learning about
-[INSERT queries](#insert-queries). 
+[SELECT queries](#select-queries). 
 
 A `SELECT` query is:
 ```
@@ -296,8 +296,8 @@ SELECT [DISTINCT] (extractable_expression)
   [WHERE (condition)]
   [ORDER_BY (expression)]
   [GROUP_BY (expression)]
-  [LIMIT bound_value]    - database-specific
-  [OFFSET bound_value]   - database-specific
+  [LIMIT bound_value]    <- database-specific
+  [OFFSET bound_value]   <- database-specific
 ```
 
 An `INSERT` query is:
@@ -393,6 +393,24 @@ scalar_expression { IS_NULL | IS_NOT_NULL }
 ```
 scalar_expression { == | <> | != | > | < } scalar_expression }
 ```
+
+## SELECT Queries
+SELECT queries in sqins are functions that take an implicit java.sql.Connection and return a `SelectResult[T]` representing
+the resulting rows.  `SelectResult[T]` is an `Iterable[T]` backed by the ResultSet from the database.
+the resulting rows.  The actual class is `SelectResult[T]`.  Type type of the result is based on what appears in the SELECT clause.
+
+Our examples are based on the [mapping shown above](#tables).
+
+```scala
+val query = SELECT (li.id) FROM (li)
+db.withConnection { implicit conn => 
+val result:Iterable[T] = 
+```
+
+For single-table queries, you can leave off the parentheses around the table.
+
+```scala
+val query
 
 ## INSERT Queries
 

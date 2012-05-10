@@ -46,7 +46,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
   val li = line_item AS "li"
 
   "Schema" should "be initializable" in {
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       db.initSchema.executeUpdate
     }
   }
@@ -56,7 +56,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
     val query = SQL("INVALID_SQL ?", ?(5))
 
     try {
-      db.withConnection { implicit conn: Connection =>
+      db.withConnection { implicit conn =>
         query.executeQuery(conn)
       }
     } catch {
@@ -76,7 +76,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       VALUES (?(invoice.description)))
 
     val invoice = Invoice(description = "An invoice")
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       insertedInvoiceId = insertInvoice(invoice) go
     }
     insertedInvoiceId should equal(Some(1))
@@ -93,7 +93,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
           VALUES (lineItem))
 
         val lineItem = LineItem(invoice_id = 1, amount = 25)
-        db.withConnection { implicit conn: Connection =>
+        db.withConnection { implicit conn =>
           insertLineItem(lineItem) go
         }
       }
@@ -111,7 +111,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
                                           |FROM invoice
                                           |WHERE invoice.id = ?""".stripMargin)
 
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn) should equal(0)
     }
   }
@@ -125,7 +125,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
                                           |FROM invoice
                                           |WHERE invoice.id = ?""".stripMargin)
 
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn) should equal(0)
     }
   }
@@ -135,7 +135,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       UPDATE(li)
       SET (li.amount := ?(56.77), li.invoice_id := li.invoice_id))
 
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn) should equal(1)
     }
   }
@@ -146,7 +146,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       SET (li.amount := ?(56.79))
       WHERE li.invoice_id == ?(1) && li.invoice_id <> li.id)
 
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn) should equal(0)
     }
   }
@@ -159,7 +159,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
     query.updateExpression should equal("""|UPDATE line_item AS li
                                      |SET invoice_id = ?, amount = ?
                                      |WHERE li.id = ?""".stripMargin)
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn) should equal(1)
     }
   }
@@ -179,7 +179,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
                                            |FROM line_item AS li2
                                            |WHERE li2.id = li.id AND li2.id <> ?)""".stripMargin)
 
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn) should equal(1)
     }
   }
@@ -191,7 +191,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
 
   var simpleSelectResult: SelectResult[Invoice] = null
   it should "act as a function that takes a connection and returns a typed SelectResult" in {
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       simpleSelectResult = simpleSelectQuery(conn)
     }
   }
@@ -246,7 +246,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       """|SELECT i.id, i.description, i.image, li.id, li.invoice_id, li.amount, li.ts
            |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id""".stripMargin)
 
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn).foreach(row => {
         row._1.id should equal(1)
         row._1.description should equal("An invoice")
@@ -348,7 +348,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
            |LIMIT ?
            |OFFSET ?""".stripMargin)
 
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn).toList.length should equal(0)
     }
   }
@@ -364,7 +364,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
            |FROM invoice AS i
            |WHERE i.id = (SELECT MAX(id) FROM line_item)""".stripMargin)
 
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn).toList.length should equal(1)
     }
   }
@@ -380,7 +380,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
                                           |FROM invoice)
                                           |FROM invoice AS i""".stripMargin)
 
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn).toList.length should equal(1)
     }
   }
@@ -397,7 +397,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
                                           |FROM invoice
                                           |WHERE invoice.description = i.description)""".stripMargin)
 
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn).toList.length should equal(1)
     }
   }
@@ -424,7 +424,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
          |OFFSET ?""".stripMargin)
 
     // Run the query
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       val result: Iterable[(Invoice, LineItem, BigDecimal, BigDecimal, Int)] = query(conn)
       result.foreach { row =>
         {
@@ -454,7 +454,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       .map(_.toByte)
       .toArray
     val invoice = Invoice(description = "An invoice", image = Some(imageData))
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       insertInvoice(invoice)(conn)
     }
   }
@@ -466,13 +466,13 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       """|DELETE FROM line_item
            |WHERE line_item.id = ?""".stripMargin)
 
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       query(conn)
     }
   }
 
   it should "return the number of deleted rows" in {
-    db.withConnection { implicit conn: Connection =>
+    db.withConnection { implicit conn =>
       val query = DELETE FROM line_item
       query.deleteExpression should equal("DELETE FROM line_item")
       query.go should equal(1)
