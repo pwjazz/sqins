@@ -298,14 +298,17 @@ FROM (from_item)
 [LIMIT bound_value]    - database-specific
 [OFFSET bound_value]   - database-specific
 ```
+
 where extractable_expression is:
 ```
 extractable_scalar [, ...]
 ```
+
 where extractable_scalar is:
 ```
 { scalar_value | another SELECT query }
 ```
+
 where scalar_value is:
 ```
 { column | projection | function_call | bound_value }
