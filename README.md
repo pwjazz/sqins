@@ -292,34 +292,31 @@ This section describes the full grammar of sqins.  If you want some lighter read
 A SELECT query is:
 ```
 SELECT [DISTINCT] (extractable_expression)
-FROM (from_item)
-[WHERE (condition)]
-[ORDER_BY (expression)]
-[GROUP_BY (expression)]
-[LIMIT bound_value]    - database-specific
-[OFFSET bound_value]   - database-specific
+  FROM (from_item)
+  [WHERE (condition)]
+  [ORDER_BY (expression)]
+  [GROUP_BY (expression)]
+  [LIMIT bound_value]    - database-specific
+  [OFFSET bound_value]   - database-specific
 ```
 
 An INSERT query is:
 ```
 INSERT INTO table [(column [, ...])]
-{
-  VALUES ({ bound_value [, ...] | row_object }) |
-  a SELECT query
-}
+  { VALUES ({ bound_value [, ...] | row_object }) |  a SELECT query }
 ```
 
 An UPDATE query is:
 ```
 UPDATE (table)
-SET ({ expression | row_object })
-[WHERE (condition)]
+  SET ({ expression | row_object })
+  [WHERE (condition)]
 ```
 
 A DELETE query is
 ```
 DELETE FROM table
-[WHERE (condition)]
+  [WHERE (condition)]
 ```
 
 A pure SQL query is
