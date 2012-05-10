@@ -289,7 +289,7 @@ singleton object, it doesn't cost much and it's very convenient.
 This section describes the full grammar of sqins.  If you want some lighter reading, skip ahead to start learning about
 [INSERT queries](#insert-queries). 
 
-A SELECT query is:
+A `SELECT` query is:
 ```
 SELECT [DISTINCT] (extractable_expression)
   FROM (from_item)
@@ -300,95 +300,96 @@ SELECT [DISTINCT] (extractable_expression)
   [OFFSET bound_value]   - database-specific
 ```
 
-An INSERT query is:
+An `INSERT` query is:
 ```
 INSERT INTO table [(column [, ...])]
   { VALUES ({ bound_value [, ...] | row_object }) |  a SELECT query }
 ```
 
-An UPDATE query is:
+An `UPDATE` query is:
 ```
 UPDATE (table)
   SET ({ expression | row_object })
   [WHERE (condition)]
 ```
 
-A DELETE query is
+A `DELETE` query is
 ```
 DELETE FROM table
   [WHERE (condition)]
 ```
 
-A pure SQL query is
+A pure `SQL` query is
 ```
 SQL("a sql string")
 ```
 
-where *expression* is:
+*expression* is:
 ```
 { scalar_expression | set_expression } [, ...]
 ```
 
-where scalar_expression is:
+*scalar_expression* is:
 ```
 { scalar_value [ ASC | DESC ] | EXPR("arbitrary SQL") }
 ```
 
-where set_expression is:
+*set_expression* is:
 ```
 scalar_expression := scalar_value
 ```
 
-where extractable_expression is:
+*extractable_expression* is:
 ```
 extractable_scalar [, ...]
 ```
 
-where extractable_scalar is:
+*extractable_scalar* is:
 ```
 { scalar_value | another SELECT query }
 ```
 
-where scalar_value is:
+*scalar_value* is:
 ```
 { column | projection | function_call | bound_value }
 ```
 
-where function_call is:
+*function_call* is:
 ```
-{ predefined_function | FN("function name") } (
+{ predefined_function | FN("function name") } ({ scalar_value | expression })
+```
 
-where projection is:
+*projection* is:
 ```
 table.*
 ```
 
-where bound_value is:
+*bound_value* is:
 ```
 ?(any value from your code, like a variable or a constant expression)
 ```
 
-where row_object is:
+*row_object* is:
 ```
 An instance of a case class representing a row from the table being inserted/updated
 ```
 
-where from_item is:
+*from_item* is:
 ```
 table [INNER_JOIN table ON condition ...]
 ```
 
-where condition is:
+*condition* is:
 ```
 { unary_condition | binary_condition } [{ && | || } condition]
 ```
 
-where unary_condition is:
+*unary_condition* is:
 ```
 scalar_expression { IS_NULL | IS_NOT_NULL }
 ```
 
-where binary_condition is:
+*binary_condition* is:
 ```
 scalar_expression { == | <> | != | > | < } scalar_expression }
 ```
