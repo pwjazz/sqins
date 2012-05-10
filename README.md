@@ -287,7 +287,7 @@ singleton object, it doesn't cost much and it's very convenient.
 ## Grammar
 
 This section describes the full grammar of sqins.  If you want some lighter reading, skip ahead to start learning about
-[INSERT queries](#INSERT). 
+[INSERT queries](#insert-queries). 
 
 A SELECT query is:
 ```
@@ -395,7 +395,7 @@ where binary_condition is:
 scalar_expression { == | <> | != | > | < } scalar_expression }
 ```
 
-## <a name="INSERT">INSERT Queries</a>
+## INSERT Queries
 
 TODO
 
