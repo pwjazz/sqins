@@ -258,7 +258,7 @@ case class InsertValuesQuery[T, +K](into: IntoItem[T, K], values: Seq[BoundValue
   }
 
   def go(implicit conn: Connection) = apply(conn)
-
+  
   override def toString = insertExpression
 }
 
@@ -387,11 +387,3 @@ case class DeleteQuery[T](table: Table[T, _], where: Option[Condition] = None) {
 object DELETE {
   def FROM[T](table: Table[T, _]) = DeleteQuery(table)
 }
-
-/**
- * Execute a callback on the given connection
- */
-object on {
-  def apply[T](conn: Connection)(fn: (Connection) => T) = fn(conn)
-}
-

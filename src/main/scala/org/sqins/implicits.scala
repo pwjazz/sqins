@@ -31,6 +31,7 @@ import java.sql.ResultSet
 import java.sql.PreparedStatement
 import java.sql.Date
 import java.sql.Timestamp
+import java.sql.Connection
 
 /**
  * Pre-defined implicit type mappings and other implicit conversions.  sqins requires that these be brought into scope
@@ -100,6 +101,12 @@ object Implicits {
 
   // Allow Aliases to be treated as whatever was aliased
   implicit def aliasToAliased[T, E <: Value[T]](alias: Alias[T, E]) = alias.aliased
+  
+  // Treat an InsertValuesQuery as its result
+  implicit def insertValuesQueryToResult[K](query: InsertValuesQuery[_, K])(implicit conn: Connection) = query(conn)
+  
+  // Treat a SelectQuery as its result
+  implicit def selectQueryToResult[T](query: SelectQuery[T])(implicit conn: Connection) = query(conn)
   
   // Built-in functions (aggregates, etc)
   val AVG = FN("AVG")
