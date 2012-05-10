@@ -199,7 +199,18 @@ sqins uses `TypeMapping` implicitly.  All constructors and methods that require 
 
 sqins includes TypeMappings for the following types (and their related `Option` types)
 
-Byte, Short, Int, Long, Float, Double, Boolean, String, scala.math.BigDecimal, java.sql.Date, java.sql.Timestamp, Array[Byte]  
+`Byte`  
+`Short`  
+`Int`  
+`Long`  
+`Float`  
+`Double`  
+`Boolean`  
+`String`  
+`scala.math.BigDecimal`  
+`java.sql.Date`  
+`java.sql.Timestamp`  
+`Array[Byte]`  
 
 #### Defining Custom TypeMappings
 
