@@ -69,7 +69,7 @@ db.withConnection { implicit conn =>
 
 * [scalaquery](http://scalaquery.org/) - Seems to be one of the more popular ones
 * [squeryl](http://squeryl.org/) - Also fairly popular
-* [CircumflexORM](http://circumflex.ru/projects/orm/index.html) - Syntax inspired sqins, but it's an ORM  
+* [CircumflexORM](http://circumflex.ru/projects/orm/index.html) - Syntax served as inspiration for sqins, but it's an ORM  
 
 ## Installation
 
