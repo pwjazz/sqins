@@ -1,8 +1,8 @@
 sqins - (s)tructured (q)ueries (in) (S)cala
 -------------------------------------------
 
-sqins provides type-safe SQL `INSERT`, `UPDATE`, `DELETE` and `SELECT` statements inside Scala.  sqins makes 80% of typical DML
-really easy and stays out of the way for the other 20%.
+sqins provides type-safe SQL `INSERT`, `UPDATE`, `DELETE` and `SELECT` statements inside Scala using SQL-like syntax.
+sqins makes 80% of typical DML really easy and stays out of the way for the other 20%.
 
 **License Style** - [BSD 3 Clause](http://www.opensource.org/licenses/BSD-3-Clause)
 
@@ -652,7 +652,7 @@ it allows you to reuse that awesome SQL from other tools.
 
 ### Pure SQL Queries
 
-Don't like views?  Need to do some weird INSERT or UPDATE queries?
+Don't like views?  Need to do some weird INSERT or UPDATE queries?  Want to run DDL?
 
 When sqins just won't do, you can also do pure SQL queries including bind parameters:
 
