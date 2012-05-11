@@ -808,6 +808,7 @@ scalar_expression { == | <> | != | > | >= | < | <= } scalar_expression }
     * Clean up class and method visibility
     * Generate scaladoc
 * All queries
+    * Make sure we have a proper model for resource cleanup (prepared statements, resultsets, connections)
     * Add these keywords: LIKE, ILIKE, IN, EXISTS
     * Provide nicer error messages by using @implicitNotFound
     * Support for tables with no primary key

@@ -85,6 +85,9 @@ case class IncompleteSelectQuery[T](select: Extractable[T] with Expression, dist
   def FROM(from: FromItem) = SelectQuery(select, distinct, from)
 }
 
+/**
+ * Base class for all variants of SELECT query, including SELECT and INSERT INTO ... SELECT ...
+ */
 trait BaseSelectQuery[T] extends ScalarExpression with Extractable[T] {
   def select: Extractable[T] with Expression
   def distinct: Boolean
@@ -237,6 +240,14 @@ protected class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => 
   }
 
   def next = rowReader(rs)
+  
+  override protected def finalize(): Unit = {
+    try {
+      rs.close()
+    } catch {
+      case e: Throwable => // ignore
+    }
+  }
 }
 
 /**

@@ -38,6 +38,35 @@ import java.sql.Connection
  * in order to build table definitions and queries.
  */
 object Implicits {
+  // Allow Aliases to be treated as whatever was aliased
+  implicit def aliasToAliased[T, E <: ScalarValue[T]](alias: Alias[T, E]) = alias.aliased
+  
+  // Treat a SelectQuery as its result
+  implicit def selectQueryToResult[T](query: SelectQuery[T])(implicit conn: Connection) = query(conn)
+  
+  // Treat an InsertValuesQuery as its result
+  implicit def insertValuesQueryToResult[K](query: InsertValuesQuery[_, K])(implicit conn: Connection) = query(conn)
+  
+  // Treat an InsertSelectQuery as its result
+  implicit def insertSelectQueryToResult[T](query: InsertSelectQuery[T])(implicit conn: Connection) = query(conn)
+  
+  // Treat an UpdateQuery as its result
+  implicit def updateQueryToResult[T](query: UpdateQuery[T])(implicit conn: Connection) = query(conn)
+  
+  // Treat a DeleteQuery as its result
+  implicit def deleteQueryToResult[T](query: DeleteQuery[T])(implicit conn: Connection) = query(conn)
+  
+  // Built-in functions (aggregates, etc)
+  val AVG = FN("AVG")
+  val COUNT = FN("COUNT")
+  val COUNT_DISTINCT = FN("COUNT", Some("DISTINCT"))
+  val COUNT_* = EXPR("COUNT(*)")
+  val MIN = FN("MIN")
+  val MAX = FN("MAX")
+  val SUM = FN("SUM")
+  val VAR_POP = FN("VAR_POP")
+  val VAR_SAMP = FN("VAR_SAMP")
+
   // Type mappings
   implicit object ByteTypeMapping extends TypeMapping[Byte] {
     def _get(rs: ResultSet, position: Int) = Extraction(rs.getByte(position), 1)
@@ -110,35 +139,6 @@ object Implicits {
     def _set(ps: PreparedStatement, position: Int, value: Array[Byte]) = ps.setBytes(position, value)
   }
   implicit val OptionByteArrayTypeMapping = new OptionTypeMapping(ByteArrayTypeMapping)
-
-  // Allow Aliases to be treated as whatever was aliased
-  implicit def aliasToAliased[T, E <: ScalarValue[T]](alias: Alias[T, E]) = alias.aliased
-  
-  // Treat a SelectQuery as its result
-  implicit def selectQueryToResult[T](query: SelectQuery[T])(implicit conn: Connection) = query(conn)
-  
-  // Treat an InsertValuesQuery as its result
-  implicit def insertValuesQueryToResult[K](query: InsertValuesQuery[_, K])(implicit conn: Connection) = query(conn)
-  
-  // Treat an InsertSelectQuery as its result
-  implicit def insertSelectQueryToResult[T](query: InsertSelectQuery[T])(implicit conn: Connection) = query(conn)
-  
-  // Treat an UpdateQuery as its result
-  implicit def updateQueryToResult[T](query: UpdateQuery[T])(implicit conn: Connection) = query(conn)
-  
-  // Treat a DeleteQuery as its result
-  implicit def deleteQueryToResult[T](query: DeleteQuery[T])(implicit conn: Connection) = query(conn)
-  
-  // Built-in functions (aggregates, etc)
-  val AVG = FN("AVG")
-  val COUNT = FN("COUNT")
-  val COUNT_DISTINCT = FN("COUNT", Some("DISTINCT"))
-  val COUNT_* = EXPR("COUNT(*)")
-  val MIN = FN("MIN")
-  val MAX = FN("MAX")
-  val SUM = FN("SUM")
-  val VAR_POP = FN("VAR_POP")
-  val VAR_SAMP = FN("VAR_SAMP")
 
   // Automatically convert tuples of expressions into single Expressions
   implicit def tuple2ToExpression[T1 <: Expression, T2 <: Expression](tuple: Tuple2[T1, T2]) = CompoundExpression2(tuple._1, tuple._2)
