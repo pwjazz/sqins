@@ -644,16 +644,24 @@ FROM (i)
 WHERE (i.id = (SELECT max(li.invoice_id) FROM li))
 ```
 
+### How I learned to stop worrying about sqins syntax and love the view
+
+Sometimes, you really need to do some super-awesome SQL trickery and sqins' syntax just doesn't cut it.  May I
+suggest writing a view and mapping from sqins to the view?  This lets you use your database for what it's good at, and
+it allows you to reuse that awesome SQL from other tools.
+
 ### Pure SQL Queries
 
-When sqins just won't do, one can also do pure SQL queries including bind parameters:
+Don't like views?  Need to do some weird INSERT or UPDATE queries?
+
+When sqins just won't do, you can also do pure SQL queries including bind parameters:
 
 ```scala
 val numberOfUpdatedRows: Long = SQL("DELETE FROM invoice WHERE id <= ?", 5).executeUpdate
 ```
 
-One can also do SELECTs:
-
+There's also an `executeQuery` method that returns a ResultSet like you would expect.
+ 
 ```scala
 val result: ResultSet = SQL("SELECT * FROM invoice").executeQuery
 ```
