@@ -93,7 +93,7 @@ private[sqins] trait ScalarExpression extends Expression {
 /**
  * A scalar expression that is just a string. Useful for plugging in stuff not natively supported by the syntax.
  */
-case class ConstantScalarExpression(expression: String) extends ScalarExpression
+case class ConstantScalarExpression(expression: String) extends Condition
 
 /**
  * A scalar value that is just a string. Useful for plugging in stuff not natively supported by the syntax.

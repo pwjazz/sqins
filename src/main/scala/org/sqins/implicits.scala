@@ -120,8 +120,14 @@ object Implicits {
   // Treat an InsertValuesQuery as its result
   implicit def insertValuesQueryToResult[K](query: InsertValuesQuery[_, K])(implicit conn: Connection) = query(conn)
   
+  // Treat an InsertSelectQuery as its result
+  implicit def insertSelectQueryToResult[T](query: InsertSelectQuery[T])(implicit conn: Connection) = query(conn)
+  
   // Treat an UpdateQuery as its result
   implicit def updateQueryToResult[T](query: UpdateQuery[T])(implicit conn: Connection) = query(conn)
+  
+  // Treat a DeleteQuery as its result
+  implicit def deleteQueryToResult[T](query: DeleteQuery[T])(implicit conn: Connection) = query(conn)
   
   // Built-in functions (aggregates, etc)
   val AVG = FN("AVG")
