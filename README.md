@@ -109,7 +109,8 @@ create table line_item (
   ts TIMESTAMP,
   primary key(id)); 
 
-alter table line_item add constraint fk_line_item_invoice foreign key (invoice_id) references invoice(id);
+alter table line_item add constraint fk_line_item_invoice
+  foreign key (invoice_id) references invoice(id);
 ```
 
 * The `id` columns are `SERIAL`, which means that they'll be auto-generated
@@ -236,7 +237,8 @@ object MyTypeMappings {
       ps.setString(position, value.wrapped)
   }
 
-  // Option types can usually be mapped by just wrapping the regular TypeMapping with an OptionTypeMapping
+  // Option types can usually be mapped by just wrapping
+  // the regular TypeMapping with an OptionTypeMapping
   implicit val OptionMyTypeMapping = new OptionTypeMapping(MyTypeMapping)
 }
 
@@ -733,7 +735,8 @@ extractable_scalar [, ...]
 
 *scalar_value* is:
 ```
-{ column | projection | scalar_function_call | bound_value | VEXPR("custom SQL") | scalar_value operator scalar_expression }
+{ column | projection | scalar_function_call | bound_value |
+  VEXPR("custom SQL") | scalar_value operator scalar_expression }
 ```
 
 *operator* is:
