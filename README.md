@@ -62,6 +62,14 @@ db.withConnection { implicit conn =>
  * No SQL-injection - by using PreparedStatements and bound parameters, sqins keeps you out of SQL injection trouble.
  * Works with PostgreSQL - other databases are on the way.
  * Runs in your container - sqins doesn't care where you get your connections, so it works equally well in containerless and in-container apps.
+ * Friendly error messages - if something goes wrong while executing SQL, sqins gives you the information you need to debug it
+ * See your SQL anytime - just use the `toString` method on a query object to see the underlying SQL string
+ 
+## Other Good Options
+
+* [scalaquery](http://scalaquery.org/)
+* [squeryl](http://squeryl.org/)
+* [CircumflexORM](http://circumflex.ru/projects/orm/index.html)  
 
 ## Installation
 
@@ -499,11 +507,11 @@ SELECT (db.i.id, VEXPR[BigDecimal]("db.li.amount * 5"))
 FROM (db.i INNER_JOIN db.li ON db.i.id = db.li.invoice_id))
 ```
 
-As you'll see later, you can actually write queries that are completely strings.  Of course, the more strings you use,
-the less type safety you have.  EXPR and VEXPR are nice because they allow you to keep as much of the query typesafe
+As you'll see later, you can actually write queries that are pure strings.  Of course, the more strings you use,
+the less type safety you get.  EXPR and VEXPR are useful because they allow you to keep as much of your query type-safe
 as possible, while allowing you to take advantage of special database features where you need.
 
-WARNING - using EXPR, VEXPR and full SQL queries introduces the possibility of SQL-injection.  Be careful! 
+WARNING - using EXPR, VEXPR and pure SQL queries introduces the possibility of SQL-injection.  Be careful! 
 
 #### Functions
 
@@ -542,6 +550,8 @@ Even better, add your functions for to your custom implicits for easy reuse.
 object MyImplicits {
   implicit def SPECIAL_AGGREGATE[T] = FN[T]("SPECIAL_AGGREGATE") 
 }
+
+import MyImplicits._
 
 val query:SelectQuery[Tuple2[Long, BigDecimal]] = (
   SELECT (db.i.id, SPECIAL_AGGREGATE(db.li.amount))
@@ -588,7 +598,7 @@ val numberOfUpdatedRows: Long = (
 or entire rows
 
 ```scala
-val updatedInvoice = Invoice(id=5, description = "New description")
+val updatedInvoice = Invoice(id=5, description="New description")
 
 val numberOfUpdatedRows = (
   UPDATE (db.invoice)
@@ -604,7 +614,7 @@ UPDATE (db.invoice)
 SET (db.invoice.description := db.invoice.description || ?(" with additional text"))
 ```
 
-UPDATE queries support a WHERE clause just like SELECT queries.
+UPDATE queries support a WHERE clause just like SELECT queries:
 
 ```scala
 val numberOfUpdatedRows: Long = (
@@ -615,26 +625,12 @@ val numberOfUpdatedRows: Long = (
 
 ### DELETE Queries
 
-DELETE queries work as one would expect.
+DELETE queries work as one would expect:
 
 ```scala
 val numberOfUpdatedRows: Long = (
   DELETE FROM db.invoice
   WHERE (db.invoice.id <= ?(5))
-```
-
-### Pure SQL Queries
-
-When squeryl just won't do, one can also do pure SQL queries including bind parameters:
-
-```scala
-val numberOfUpdatedRows: Long = SQL("DELETE FROM invoice WHERE id <= ?", 5).executeUpdate
-```
-
-One can also do SELECTS:
-
-```scala
-val result: ResultSet = SQL("SELECT * FROM invoice").executeQuery
 ```
 
 ### Sub-Queries
@@ -646,6 +642,20 @@ the WHERE clause of both SELECT and UPDATE queries.
 SELECT (i.id, (SELECT max(li.id) FROM li WHERE li.invoice_id == i.id))
 FROM (i)
 WHERE (i.id = (SELECT max(li.invoice_id) FROM li))
+```
+
+### Pure SQL Queries
+
+When sqins just won't do, one can also do pure SQL queries including bind parameters:
+
+```scala
+val numberOfUpdatedRows: Long = SQL("DELETE FROM invoice WHERE id <= ?", 5).executeUpdate
+```
+
+One can also do SELECTs:
+
+```scala
+val result: ResultSet = SQL("SELECT * FROM invoice").executeQuery
 ```
 
 ### Grammar
