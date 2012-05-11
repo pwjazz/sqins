@@ -472,7 +472,7 @@ val query = (
   WHERE (db.i.id == ?(invoiceId)))
 ```
 
-Of course one can bind any valid scala expression, constant or otherwise.
+Of course one can bind any valid Scala expression, constant or otherwise.
 
 ```scala
 SELECT (db.i.id, db.li.amount)
@@ -482,15 +482,14 @@ WHERE (db.i.id == ?(5) || db.i.id == ?(5 * 35 + 3)
 
 ## Plug In Arbitrary SQL with EXPR and VEXPR
 
-sqins doesn't support the entire syntax of every database, but it often comes close.  For those times when your query
-is close, but you need something a little custom, use EXPR and VEXPR to plug in SQL with a string.
+sqins doesn't support the entire syntax of every database, but it often comes close.  For those times when your need a
+little more than native sqins can give, use EXPR and VEXPR to plug in SQL with a string.
 
-EXPR just takes any String and allows you to use it as an expression.
+EXPR takes any String and allows you to use it as an expression.
 
 ```scala
 SELECT (db.i.id, db.li.amount)
 FROM (db.i INNER_JOIN db.li ON EXPR("db.i.id funky_database_operator db.li.invoice_id"))
-WHERE (db.i.id == ?(5) || db.i.id == ?(5 * 35 + 3)
 ```
 
 VEXPR is similar to EXPR except that it's typed and can be used as a scalar value.
@@ -498,7 +497,6 @@ VEXPR is similar to EXPR except that it's typed and can be used as a scalar valu
 ```scala
 SELECT (db.i.id, VEXPR[BigDecimal]("db.li.amount * 5"))
 FROM (db.i INNER_JOIN db.li ON db.i.id = db.li.invoice_id))
-WHERE (db.i.id == ?(5) || db.i.id == ?(5 * 35 + 3)
 ```
 
 As you'll see later, you can actually write queries that are completely strings.  Of course, the more strings you use,
