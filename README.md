@@ -8,8 +8,6 @@ really easy and stays out of the way for the other 20%.
 
 **Status** - Alpha
 
-**Author** - Percy Wegmann
-
 ### This is valid sqins
 
 ```scala
@@ -54,7 +52,7 @@ db.withConnection { implicit conn =>
 
 ## Benefits
 
- * Looks like SQL - if you know SQL, you pretty much know sqins.
+ * Looks like SQL - if you know SQL, you already know sqins.
  * Strongly typed - compile time checking for SQL syntax and column types.
  * Not an ORM - sqins is just a SQL API.
  * Simple mapping - unlike an ORM, sqins just needs to know the most basic things about your tables and columns.
@@ -64,6 +62,8 @@ db.withConnection { implicit conn =>
  * No SQL-injection - by using PreparedStatements and bound parameters, sqins keeps you out of SQL injection trouble.
  * Works with PostgreSQL - other databases are on the way.
  * Runs in your container - sqins doesn't care where you get your connections, so it works equally well in containerless and in-container apps.
+
+For a deep-dive into sqins, take a look at the [grammar](#grammar).  Otherwise, read on for a gentler introduction.
 
 ## Installation
 
