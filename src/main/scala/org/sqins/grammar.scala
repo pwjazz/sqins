@@ -76,8 +76,10 @@ private[sqins] trait ScalarExpression extends Expression {
   def !=(right: ScalarExpression) = this.<>(right)
 
   def >(right: ScalarExpression) = Comparison(this, ">", right)
+  
+  def >=(right: ScalarExpression) = Comparison(this, ">=", right)
 
-  def <(right: ScalarExpression) = Comparison(this, "<", right)
+  def <=(right: ScalarExpression) = Comparison(this, "<=", right)
 
   def IS_NULL = Null(this)
 
@@ -94,10 +96,21 @@ private[sqins] trait ScalarExpression extends Expression {
 case class ConstantScalarExpression(expression: String) extends ScalarExpression
 
 /**
+ * A scalar value that is just a string. Useful for plugging in stuff not natively supported by the syntax.
+ */
+case class ConstantScalarValue[T](expression: String, typeMapping: TypeMapping[T]) extends ScalarValue[T] {
+  def extract(rs: ResultSet, position: Int) = typeMapping.get(rs, position)
+}
+
+/**
  * Factory for ScalarConstantExpressions
  */
 object EXPR {
   def apply(expression: String) = ConstantScalarExpression(expression)
+}
+
+object VEXPR {
+  def apply[T](expression: String)(implicit typeMapping: TypeMapping[T]) = ConstantScalarValue(expression, typeMapping)
 }
 
 /**
@@ -105,6 +118,25 @@ object EXPR {
  */
 private[sqins] trait ScalarValue[+T] extends ScalarExpression with Extractable[T] {
   def AS(alias: String) = Alias[T, ScalarValue[T]](this, alias)
+
+  def +(other: ScalarExpression) = CalculatedValue(this, "+", other)
+
+  def -(other: ScalarExpression) = CalculatedValue(this, "-", other)
+
+  def *(other: ScalarExpression) = CalculatedValue(this, "*", other)
+
+  def /(other: ScalarExpression) = CalculatedValue(this, "/", other)
+
+  def ||(other: ScalarExpression) = CalculatedValue(this, "||", other)
+}
+
+case class CalculatedValue[+T](scalarValue: ScalarValue[T], operator: String, other: ScalarExpression)
+    extends ScalarValue[T] {
+  override def expression = "%1$s %2$s %3$s".format(scalarValue.expression, operator, other.expression)
+
+  def extract(rs: ResultSet, position: Int) = scalarValue.extract(rs, position)
+
+  override def boundValues = scalarValue.boundValues ++ other.boundValues
 }
 
 /**
@@ -145,8 +177,11 @@ object ? {
  * A call to a database function.  The function can take one or more parameters as captured by the params Expression.
  * Only function calls returning a type of value with an in-scope implicit TypeMapping can be made.
  */
-case class FunctionCall[T](name: String, params: Expression, typeMapping: TypeMapping[T]) extends ScalarValue[T] {
-  val expression = "%1$s(%2$s)".format(name, params.expression)
+case class FunctionCall[T](name: String, qualifiers: Option[String], params: Expression, typeMapping: TypeMapping[T]) extends ScalarValue[T] {
+  val expression = qualifiers match {
+    case Some(qualifiers: String) => "%1$s(%2$s %3$s)".format(name, qualifiers, params.expression)
+    case None                     => "%1$s(%2$s)".format(name, params.expression)
+  }
 
   def extract(rs: ResultSet, position: Int) = typeMapping.get(rs, position)
 }
@@ -154,10 +189,10 @@ case class FunctionCall[T](name: String, params: Expression, typeMapping: TypeMa
 /**
  * Constructs FunctionCalls from expressions and scalar values.
  */
-case class FN(name: String) {
-  def apply[T](params: Expression)(implicit typeMapping: TypeMapping[T]) = new FunctionCall(name, params, typeMapping)
+case class FN(name: String, qualifiers: Option[String] = None) {
+  def apply[T](params: Expression)(implicit typeMapping: TypeMapping[T]) = new FunctionCall(name, qualifiers, params, typeMapping)
 
-  def apply[T](params: ScalarValue[T])(implicit typeMapping: TypeMapping[T]) = new FunctionCall(name, params, typeMapping)
+  def apply[T](params: ScalarValue[T])(implicit typeMapping: TypeMapping[T]) = new FunctionCall(name, qualifiers, params, typeMapping)
 }
 
 /**
@@ -166,7 +201,7 @@ case class FN(name: String) {
 trait IntoItem[T, +K] {
   def intoExpression: String
 
-  def primaryKey: Option[PrimaryKey[K]]
+  def primaryKey: PrimaryKey[K]
 
   def VALUES(row: T): InsertValuesQuery[T, K]
 
@@ -243,11 +278,11 @@ abstract class Relation(val name: String) extends FromItem {
  */
 abstract class Table[T: Manifest, K](override val name: String) extends Relation(name) with IntoItem[T, K] {
   val rowType = manifest[T]
-  private var _primaryKey: Option[PrimaryKey[K]] = None
+  private var _primaryKey: PrimaryKey[K] = null
 
   def primaryKey = _primaryKey
 
-  def primaryKey(column: ColumnDef[K, this.type]): Unit = _primaryKey = Some(PrimaryKey(column))
+  def primaryKey(column: ColumnDef[K, this.type]): Unit = _primaryKey = PrimaryKey(column)
 
   implicit def relation = this
 

@@ -28,15 +28,14 @@ val i = new InvoiceTable() AS "i"
 val li = new LineItemTable() AS "li"
 
 db.inTransaction { implicit conn =>
-  INSERT INTO i(i.description) VALUES (?("A new invoice")) map { invoiceId =>
-    for (i <- 1 to 5) {
-      val newLineItem = LineItem(invoice_id = invoiceId, amount = 5 * i)
-      INSERT INTO li VALUES (newLineItem) go
-    }
+  val insertedInvoiceId = INSERT INTO i(i.description) VALUES (?("A new invoice")) go
+  for (i <- 1 to 5) {
+    val newLineItem = LineItem(invoice_id = insertedInvoiceId, amount = 5 * i)
+    INSERT INTO li VALUES (newLineItem) go
   }
 }
 
-db.withConnection { implicit conn: Connection =>
+db.withConnection { implicit conn =>
   val query = (
     SELECT (i.*, li.*)
     FROM (i INNER_JOIN li ON i.id == li.invoice_id)
@@ -284,10 +283,386 @@ that, don't use `inTransaction()`.
 * It's a good idea to go ahead and define several aliases for the same table in case you need them.  Since `db` is a
 singleton object, it doesn't cost much and it's very convenient.
 
+## Querying
+
+This section is meant to be read in order--each sub-section builds on the next.  You can find the complete
+[grammar](#grammar) at the end of this section. 
+
+### SELECT Queries
+SELECT queries in sqins are functions that take an implicit java.sql.Connection and return a `SelectResult[T]` representing
+the resulting rows.  `SelectResult[T]` is an `Iterable[T]` backed by the ResultSet from the database.
+the resulting rows.  The actual class is `SelectResult[T]`.  Type type of the result is based on what appears in the SELECT clause.
+
+Our examples are based on the [mapping shown above](#tables).
+
+#### SELECT basics
+
+```scala
+val query = SELECT (db.invoice.id) FROM (db.invoice)
+db.withConnection { conn => 
+  val result:Iterable[Long] = query(conn);
+  
+  // You can only iterate over result while the Connection is still open
+  result.foreach { row =>
+    println(row * 5)
+  }
+  
+  // To return everything, you could have done this:
+  result.toList
+  
+  // The resulting list doesn't depend on the database Connection
+}   
+```
+
+Since id is a Column of type `Long`, the results are also of type `Long`.
+
+Note the parentheses around the parameters in the SELECT clause.  This is a little different than SQL, but we have to
+live with it in sqins.  For single-table queries, you can leave off the parentheses around the table at least.
+
+```scala
+val query = SELECT (db.invoice.id) FROM db.invoice
+```
+
+Queries also support the method `go`.  Since they accept implicit connections, you can use this syntax as well.
+
+```scala
+val query = SELECT (db.invoice.id) FROM db.invoice
+
+db.withConnection { implicit conn => 
+  val result:Iterable[T] = query go
+}   
+```
+
+In fact, as long as there's an implicit Connection in scope, SELECT queries can be treated as their result.
+
+```scala
+val query = SELECT (db.invoice.id) FROM db.invoice
+
+db.withConnection { implicit conn => 
+  query.foreach { row =>
+    println(row * 5)
+  }
+}   
+```
+
+Queries can return multiple values, in which case the result will be a Tuple with arity matching the number of elements
+in the SELECT clause.
+
+```scala
+val query = SELECT (db.invoice.id, db.invoice.description, db.invoice.image) FROM db.invoice
+
+db.withConnection { implicit conn => 
+  query.foreach { row: Tuple3[Long, String, Array[Byte]] =>
+    println(row._1 * 5)
+    println(row._2 + " more string")
+    println(row._3)
+  }
+}   
+```
+
+This is all well and good, but often we may want to read our actual row objects.  For this, sqins provides the * operator.
+
+```scala
+val query = SELECT (db.invoice.*) FROM db.invoice
+
+db.withConnection { implicit conn => 
+  query.foreach { row: Invoice =>
+    println(row.id * 5)
+    println(row.description + " more string")
+    println(row.image)
+  }
+}   
+```
+
+#### Joins
+
+We can also join across tables.  Right now, only INNER_JOIN is supported, but outer joins are on the roadmap.
+
+```scala
+val query = (
+  SELECT (db.i.*, db.li.*)
+  FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id))
+  
+db.withConnection { implicit conn => 
+  query.foreach { row: Tuple2[Invoice, LineItem] =>
+    println(row._1.id * 5)
+    println(row._1.description + " more string")
+    println(row._1.image)
+    println(row._2.id * 4)
+    println(row._2.invoice_id)
+    println(row._2.amount)
+    println(row._2.timestamp)
+  }
+}   
+```
+
+We're now enclosing the entire query expression in parentheses to support breaking it onto multiple lines.
+
+Note how we use the `==` operator instead of `=`.  Other comparison operators are the same as in SQL, namely
+`<>`, `<` and `>`.
+
+Of course, we can also select individual columns even when joining.
+
+```scala
+val query = (
+  SELECT (db.i.id, db.li.amount)
+  FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id))
+  
+db.withConnection { implicit conn => 
+  query.foreach { row: Tuple2[Long, BigDecimal] =>
+    println(row._1)
+    println(row._2)
+  }
+}   
+```
+
+#### WHERE clause
+
+Query results can be restricted using a WHERE clause.  The syntax for conditions inside the WHERE clause is the same as
+in the INNER_JOIN ON clause.
+
+```scala
+SELECT (db.i.id, db.li.amount)
+FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
+WHERE (db.li.amount > db.li.id)
+```
+
+Conditions are composed using && and || in place of AND and OR.
+
+```scala
+SELECT (db.i.id, db.li.amount)
+FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
+WHERE (db.li.amount > db.li.id && db.li.amount == db.li.amount)
+```
+
+The logical negation operator NOT can be applied to any condition.
+
+```scala
+SELECT (db.i.id, db.li.amount)
+FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
+WHERE (db.li.amount > db.li.id && NOT(db.li.amount <> db.li.amount))
+```
+
+#### Aggregate Queries
+
+sqins supports GROUP_BY clauses and aggregate functions.
+
+```scala
+val query:SelectQuery[Tuple2[Long, BigDecimal]] = (
+  SELECT (db.i.id, MAX(db.li.amount))
+  FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
+  GROUP_BY (db.i.id))
+```
+
+The following aggregate functions are supported out of the box:
+
+`AVG`  
+`COUNT`  
+`COUNT_DISTINCT`  
+`COUNT_*`  
+`MIN`  
+`MAX`  
+`SUM`  
+`VAR_POP`  
+`VAR_SAMP`  
+
+#### Bound Values
+
+Queries can be parameterized using bound values.  Bound values bind scala values into your query.
+
+Bound values are implemented using parameter binding in queries in order to avoid SQL injection and allow the prepared
+statements to be cached (if your datasource does that).
+
+```scala
+val invoiceId = 5
+
+val query = (
+  SELECT (db.i.id, db.li.amount)
+  FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
+  WHERE (db.i.id == ?(invoiceId)))
+```
+
+Of course one can bind any valid scala expression, constant or otherwise.
+
+```scala
+SELECT (db.i.id, db.li.amount)
+FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
+WHERE (db.i.id == ?(5) || db.i.id == ?(5 * 35 + 3)
+```
+
+## Plug In Arbitrary SQL with EXPR and VEXPR
+
+sqins doesn't support the entire syntax of every database, but it often comes close.  For those times when your query
+is close, but you need something a little custom, use EXPR and VEXPR to plug in SQL with a string.
+
+EXPR just takes any String and allows you to use it as an expression.
+
+```scala
+SELECT (db.i.id, db.li.amount)
+FROM (db.i INNER_JOIN db.li ON EXPR("db.i.id funky_database_operator db.li.invoice_id"))
+WHERE (db.i.id == ?(5) || db.i.id == ?(5 * 35 + 3)
+```
+
+VEXPR is similar to EXPR except that it's typed and can be used as a scalar value.
+
+```scala
+SELECT (db.i.id, VEXPR[BigDecimal]("db.li.amount * 5"))
+FROM (db.i INNER_JOIN db.li ON db.i.id = db.li.invoice_id))
+WHERE (db.i.id == ?(5) || db.i.id == ?(5 * 35 + 3)
+```
+
+As you'll see later, you can actually write queries that are completely strings.  Of course, the more strings you use,
+the less type safety you have.  EXPR and VEXPR are nice because they allow you to keep as much of the query typesafe
+as possible, while allowing you to take advantage of special database features where you need.
+
+WARNING - using EXPR, VEXPR and full SQL queries introduces the possibility of SQL-injection.  Be careful! 
+
+#### Functions
+
+You can use scalar functions that take one or more parameters using FN("name of function").
+
+For example, to use the database function "lower" which converts a String argument to lowercase:
+
+```scala
+SELECT (db.i.id)
+FROM db.i
+WHERE FN("lower")(db.i.description) == ?("my lowercase description") 
+```
+
+The function's return type is always the same as the specified value.  If using an expression of an unknown value,
+you can parameterize the type of FN like this:
+
+```scala
+SELECT (db.i.id)
+FROM db.i
+WHERE FN[String]("lower")(EXPR("sql expression with unknown type")) == "my lowercase description" 
+```
+
+Aggregate expressions are just functions, so if you need to do a special aggregate that's not built-into SQINS,
+you can use FN.
+
+```scala
+val query:SelectQuery[Tuple2[Long, BigDecimal]] = (
+  SELECT (db.i.id, FN("SPECIAL_AGGREGATE")(db.li.amount))
+  FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
+  GROUP_BY (db.i.id))
+```
+
+Even better, add your functions for to your custom implicits for easy reuse.
+
+```scala
+object MyImplicits {
+  implicit def SPECIAL_AGGREGATE[T] = FN[T]("SPECIAL_AGGREGATE") 
+}
+
+val query:SelectQuery[Tuple2[Long, BigDecimal]] = (
+  SELECT (db.i.id, SPECIAL_AGGREGATE(db.li.amount))
+  FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
+  GROUP_BY (db.i.id))
+```
+
+### INSERT Queries
+
+INSERT queries allow you to insert either specific values:
+
+```scala
+val insertedKey: Long = INSERT INTO db.invoice(db.invoice.description) VALUES (?("My Description"))
+```
+
+or whole rows
+```scala
+val newInvoice = new Invoice(description = "My Description")
+
+val insertedKey: Long = INSERT INTO db.invoice VALUES(newInvoice)
+```
+
+Either way, they return the inserted key.
+
+INSERT queries also allow you to insert using a SELECT statement.  This form of INSERT query returns the number of rows
+inserted.
+
+```scala
+val numberOfInsertedRows: Long = (
+  INSERT INTO db.invoice(db.invoice.description)
+  SELECT (db.invoice.description) FROM db.invoice)
+```
+
+### UPDATE Queries
+
+UPDATE queries allow you to update individual columns of a table:
+
+```scala
+val numberOfUpdatedRows: Long = (
+  UPDATE (db.invoice)
+  SET (db.invoice.description := "New description"))
+```
+
+or entire rows
+
+```scala
+val updatedInvoice = Invoice(id=5, description = "New description")
+
+val numberOfUpdatedRows = (
+  UPDATE (db.invoice)
+  SET (updatedInvoice))
+```
+
+Notice the use of `:=` in place of the usual SQL `=`.
+
+You can also use basic expressions like the concatenation operator to update values in place:
+
+```scala
+UPDATE (db.invoice)
+SET (db.invoice.description := db.invoice.description || ?(" with additional text"))
+```
+
+UPDATE queries support a WHERE clause just like SELECT queries.
+
+```scala
+val numberOfUpdatedRows: Long = (
+  UPDATE (db.invoice)
+  SET (db.invoice.description := "New description")
+  WHERE (db.invoice.id <= ?(5))
+```
+
+### DELETE Queries
+
+DELETE queries work as one would expect.
+
+```scala
+val numberOfUpdatedRows: Long = (
+  DELETE FROM db.invoice
+  WHERE (db.invoice.id <= ?(5))
+```
+
+### Pure SQL Queries
+
+When squeryl just won't do, one can also do pure SQL queries including bind parameters:
+
+```scala
+val numberOfUpdatedRows: Long = SQL("DELETE FROM invoice WHERE id <= ?", 5).executeUpdate
+```
+
+One can also do SELECTS:
+
+```scala
+val result: ResultSet = SQL("SELECT * FROM invoice").executeQuery
+```
+
+### Sub-Queries
+
+SELECT queries can appear as correlated sub-queries inside of a SELECT clause, the SET clause of an UPDATE query and
+the WHERE clause of both SELECT and UPDATE queries. 
+
+```scala
+SELECT (i.id, (SELECT max(li.id) FROM li WHERE li.invoice_id == i.id))
+FROM (i)
+WHERE (i.id = (SELECT max(li.invoice_id) FROM li))
+```
+
 ## Grammar
 
-This section describes the full grammar of sqins.  If you want some lighter reading, skip ahead to start learning about
-[SELECT queries](#select-queries). 
+This section describes the full grammar of sqins.
 
 A `SELECT` query is:
 ```
@@ -296,8 +671,8 @@ SELECT [DISTINCT] (extractable_expression)
   [WHERE (condition)]
   [ORDER_BY (expression)]
   [GROUP_BY (expression)]
-  [LIMIT bound_value]    <- database-specific
-  [OFFSET bound_value]   <- database-specific
+  [LIMIT bound_value]      <- database-specific
+  [OFFSET bound_value]     <- database-specific
 ```
 
 An `INSERT` query is:
@@ -331,7 +706,7 @@ SQL("a sql string")
 
 *scalar_expression* is:
 ```
-{ scalar_value [ ASC | DESC ] | EXPR("arbitrary SQL") }
+{ scalar_value [ ASC | DESC ] | EXPR("custom SQL") }
 ```
 
 *set_expression* is:
@@ -351,10 +726,15 @@ extractable_scalar [, ...]
 
 *scalar_value* is:
 ```
-{ column | projection | function_call | bound_value }
+{ column | projection | scalar_function_call | bound_value | VEXPR("custom SQL") | scalar_value operator scalar_expression }
 ```
 
-*function_call* is:
+*operator* is:
+```
+{ + | - | * | / | || }
+```
+
+*scalar_function_call* is:
 ```
 { predefined_function | FN("function name") } ({ scalar_value | expression })
 ```
@@ -384,6 +764,11 @@ table [INNER_JOIN table ON condition ...]
 { unary_condition | binary_condition } [{ && | || } condition]
 ```
 
+Any condition can also be negated by using NOT
+```
+NOT(condition)
+```
+
 *unary_condition* is:
 ```
 scalar_expression { IS_NULL | IS_NOT_NULL }
@@ -391,42 +776,8 @@ scalar_expression { IS_NULL | IS_NOT_NULL }
 
 *binary_condition* is:
 ```
-scalar_expression { == | <> | != | > | < } scalar_expression }
+scalar_expression { == | <> | != | > | >= | < | <= } scalar_expression }
 ```
-
-## SELECT Queries
-SELECT queries in sqins are functions that take an implicit java.sql.Connection and return a `SelectResult[T]` representing
-the resulting rows.  `SelectResult[T]` is an `Iterable[T]` backed by the ResultSet from the database.
-the resulting rows.  The actual class is `SelectResult[T]`.  Type type of the result is based on what appears in the SELECT clause.
-
-Our examples are based on the [mapping shown above](#tables).
-
-```scala
-val query = SELECT (li.id) FROM (li)
-db.withConnection { implicit conn => 
-val result:Iterable[T] = 
-```
-
-For single-table queries, you can leave off the parentheses around the table.
-
-```scala
-val query
-
-## INSERT Queries
-
-TODO
-
-## UPDATE Queries
-
-TODO
-
-## DELETE Queries
-
-TODO
-
-## Pure SQL Queries
-
-TODO
 
 ## Roadmap
 
@@ -456,7 +807,3 @@ TODO
     * MySQL
     * Oracle
     * SqlServer
-
-### Setup in SBT
-
-TODO:

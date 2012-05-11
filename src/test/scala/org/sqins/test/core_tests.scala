@@ -67,7 +67,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
-  var insertedInvoiceId: Option[Long] = null
+  var insertedInvoiceId: Long = null.asInstanceOf[Long]
 
   "The INSERT function" should "be able to construct an insert query using full table names and specific columns" in {
     // Define some query builder methods
@@ -79,26 +79,20 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
     db.withConnection { implicit conn =>
       insertedInvoiceId = insertInvoice(invoice) go
     }
-    insertedInvoiceId should equal(Some(1))
+    insertedInvoiceId should equal(1)
   }
 
   it should "also be able to construct an insert query using table aliases and whole rows" in {
     val ia = i AS "ia"
     val lia = li AS "lia"
 
-    insertedInvoiceId match {
-      case Some(invoiceId: Long) => {
-        def insertLineItem(lineItem: LineItem) = (
-          INSERT INTO li
-          VALUES (lineItem))
+    def insertLineItem(lineItem: LineItem) = (
+      INSERT INTO li
+      VALUES (lineItem))
 
-        val lineItem = LineItem(invoice_id = 1, amount = 25)
-        db.withConnection { implicit conn =>
-          insertLineItem(lineItem) go
-        }
-      }
-
-      case None => fail("There should have been an invoice id")
+    val lineItem = LineItem(invoice_id = insertedInvoiceId, amount = 25)
+    db.withConnection { implicit conn =>
+      insertLineItem(lineItem) go
     }
   }
 
@@ -130,10 +124,10 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
-  "An UPDATE statement" should "return the number of rows updated" in {
+  "An UPDATE query" should "return the number of rows updated" in {
     val query = (
       UPDATE(li)
-      SET (li.amount := ?(56.77), li.invoice_id := li.invoice_id))
+      SET (li.amount := li.amount + ?(5), li.invoice_id := li.invoice_id))
 
     db.withConnection { implicit conn =>
       query(conn) should equal(1)
@@ -369,6 +363,20 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
+  it should "support the use of strings to plug in values for unsupported syntax" in {
+    val query: SelectQuery[Tuple2[Long, BigDecimal]] = (
+      SELECT(i.id, VEXPR[BigDecimal]("(SELECT MAX(amount) FROM line_item WHERE invoice_id = i.id)"))
+      FROM i)
+
+    query.queryExpression should equal(
+      """|SELECT i.id, (SELECT MAX(amount) FROM line_item WHERE invoice_id = i.id)
+           |FROM invoice AS i""".stripMargin)
+
+    db.withConnection { implicit conn =>
+      query(conn).toList.length should equal(1)
+    }
+  }
+
   it should "support subqueries in the SELECT clause" in {
     val subQuery: SelectQuery[Long] = SELECT(MAX(invoice.id)) FROM invoice
 
@@ -489,7 +497,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
     object MyTypeMappings {
       implicit object MyTypeMapping extends TypeMapping[MyType] {
         def _get(rs: ResultSet, position: Int) = Extraction(MyType(rs.getString(position)), 1)
-        
+
         def _set(ps: PreparedStatement, position: Int, value: MyType) = ps.setString(position, value.wrapped)
       }
 

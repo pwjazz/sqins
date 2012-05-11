@@ -245,20 +245,18 @@ protected class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => 
 case class InsertValuesQuery[T, +K](into: IntoItem[T, K], values: Seq[BoundValue[_]]) {
   def insertExpression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
 
-  def apply(implicit conn: Connection): Option[K] = {
+  def apply(implicit conn: Connection): K = {
     val ps = SQL(insertExpression, values).executeInsert(conn)
-    into.primaryKey.flatMap(extractor => {
-      val generatedKeys = ps.getGeneratedKeys
-      if (generatedKeys.next) {
-        Some(extractor.extract(generatedKeys, 1).value)
-      } else {
-        None
-      }
-    })
+    val generatedKeys = ps.getGeneratedKeys
+    if (generatedKeys.next) {
+      into.primaryKey.extract(generatedKeys, 1).value
+    } else {
+      throw new Error("Inserting value failed for query: %1$s with values %2$s".format(insertExpression, values.mkString(", ")))
+    }
   }
 
   def go(implicit conn: Connection) = apply(conn)
-  
+
   override def toString = insertExpression
 }
 
@@ -329,7 +327,7 @@ object INSERT {
 case class IncompleteUpdateQuery[T](table: Table[T, _]) {
   def SET(set: Expression) = UpdateQuery(table, set)
 
-  def SET(row: T) = UpdateQuery(table, table.setExpression(row), table.primaryKey.map((_ == row)))
+  def SET(row: T) = UpdateQuery(table, table.setExpression(row), Some(table.primaryKey == row))
 }
 
 case class UpdateQuery[T](table: Table[T, _], set: Expression, where: Option[Condition] = None) {
