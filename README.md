@@ -277,9 +277,9 @@ This section is meant to be read in order--each sub-section builds on the next. 
 [grammar](#grammar) at the end of this section. 
 
 ### SELECT Queries
-SELECT queries in sqins are functions that take an implicit java.sql.Connection and return a `SelectResult[T]` representing
-the resulting rows.  `SelectResult[T]` is an `Iterable[T]` backed by the ResultSet from the database.
-the resulting rows.  The actual class is `SelectResult[T]`.  Type type of the result is based on what appears in the SELECT clause.
+SELECT queries in sqins are functions that take an implicit `java.sql.Connection` and return a `SelectResult[T]` representing
+the resulting rows.  `SelectResult[T]` is an `Iterable[T]` backed by the ResultSet from the database.  Type type of the
+each result is based on what appears in the SELECT clause.
 
 Our examples are based on the [mapping shown above](#tables).
 
@@ -287,6 +287,7 @@ Our examples are based on the [mapping shown above](#tables).
 
 ```scala
 val query = SELECT (db.invoice.id) FROM (db.invoice)
+
 db.withConnection { conn => 
   val result:Iterable[Long] = query(conn);
   
@@ -321,7 +322,8 @@ db.withConnection { implicit conn =>
 }   
 ```
 
-In fact, as long as there's an implicit Connection in scope, SELECT queries can be treated as their result.
+In fact, as long as there's an implicit Connection in scope, SELECT queries can be directly treated as their result
+without having to call the `go` method.
 
 ```scala
 val query = SELECT (db.invoice.id) FROM db.invoice
@@ -387,7 +389,7 @@ db.withConnection { implicit conn =>
 We're now enclosing the entire query expression in parentheses to support breaking it onto multiple lines.
 
 Note how we use the `==` operator instead of `=`.  Other comparison operators are the same as in SQL, namely
-`<>`, `<` and `>`.
+`<>`, `<`, `<=`, `>` and `>=`.
 
 Of course, we can also select individual columns even when joining.
 
@@ -419,8 +421,8 @@ Conditions are composed using && and || in place of AND and OR.
 
 ```scala
 SELECT (db.i.id, db.li.amount)
-FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
-WHERE (db.li.amount > db.li.id && db.li.amount == db.li.amount)
+FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id && db.li.id <> db.i.id)
+WHERE (db.li.amount > db.li.id || db.li.amount == db.li.amount)
 ```
 
 The logical negation operator NOT can be applied to any condition.
@@ -456,10 +458,10 @@ The following aggregate functions are supported out of the box:
 
 #### Bound Values
 
-Queries can be parameterized using bound values.  Bound values bind scala values into your query.
+Queries can be parameterized using bound values.  Bound values bind Scala values into your query.
 
-Bound values are implemented using parameter binding in queries in order to avoid SQL injection and allow the prepared
-statements to be cached (if your datasource does that).
+Bound values are implemented using positional parameter binding in `PreparedStatements` in order to avoid SQL injection
+and allow the PreparedStatements to be cached (if your datasource does that).
 
 ```scala
 val invoiceId = 5
