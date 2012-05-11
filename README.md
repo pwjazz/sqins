@@ -57,7 +57,8 @@ db.withConnection { implicit conn =>
  * Not an ORM - sqins is just a SQL API.
  * Simple mapping - unlike an ORM, sqins just needs to know the most basic things about your tables and columns.
  * Extensible scalar types - sqins comes with support for basic types like numbers, strings and dates and makes it super-easy to define new type mappings.
- * Side-effect free - sqins doesn't cache data, maintain identity or relationships or do any other ORM funkiness.  This makes it easier to use, and makes it usable in idiomatic Scala. 
+ * Side-effect free - sqins doesn't cache data, maintain identity or relationships or do any other ORM funkiness.  This makes it easier to use, and makes it usable in idiomatic Scala.
+ * Data objects don't depend on sqins - unlike with some ORMs, data objects have no reference to any sqins artifacts, so you can freely pass them around the network. 
  * Smart performance - sqins employs common-sense optimizations like using PreparedStatements, streaming results from cursors, etc.
  * No SQL-injection - by using PreparedStatements and bound parameters, sqins keeps you out of SQL injection trouble.
  * Works with PostgreSQL - other databases are on the way.
