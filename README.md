@@ -72,9 +72,20 @@ db.withConnection { implicit conn =>
 * [squeryl](http://squeryl.org/) - Also fairly popular
 * [CircumflexORM](http://circumflex.ru/projects/orm/index.html) - Syntax served as inspiration for sqins, but it's an ORM  
 
-## Installation
+## Installation (with SBT)
 
-// TODO: publish sqins to a Maven repo
+sqins is hosted on Sonatype's OSS repository.  Make sure that you have the necessary resolvers:
+
+```scala
+resolvers ++= Seq(
+    "Sonatype OSS Snapshots" at "http://oss.sonatype.org/content/repositories/snapshots/",
+    "Sonatype OSS releases" at "http://oss.sonatype.org/content/repositories/releases"
+)
+```
+
+Add a dependency for sqins.  The latest version is 0.1-SNAPSHOT
+
+libraryDependencies += "org.sqins" % "sqins_2.9.1" % "0.1-SNAPSHOT"
 
 ## Imports
 
