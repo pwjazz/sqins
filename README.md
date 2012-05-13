@@ -85,7 +85,9 @@ resolvers ++= Seq(
 
 Add a dependency for sqins.  The latest version is 0.1-SNAPSHOT
 
+```scala
 libraryDependencies += "org.sqins" % "sqins_2.9.1" % "0.1-SNAPSHOT"
+```
 
 ## Imports
 
