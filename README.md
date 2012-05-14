@@ -849,24 +849,33 @@ EXISTS select_query
 
 ## Roadmap
 
+### Release 0.1
+
 * All queries
     * Make sure we have a proper model for resource cleanup (prepared statements, resultsets, connections)
     * Provide nicer error messages by using @implicitNotFound
     * Support for tables with no primary key
     * Support for tables with multi-column primary keys
     * Indentation in query output for better readability
-    * Support for mapping composite types (multiple columns per value)
-    * Support for type-casting functions???
-    * Support for mapping to non-case classes???
-    * Support for correlated subqueries in from clause???
-* INSERT queries
-    * Support for DEFAULT column values in the VALUES clause    
 * SELECT queries
     * Support for left and right outer joins (includes operator similar to ScalaQuery ? to turn columns from an outer join into Option values)
     * Support for UNION, INTERSECT and EXCEPT
-* UPDATE queries
-    * Tighten up type checking for the SET expression (right now, it's just any expression)
+    
+### Release 0.2
+
 * Database Support
     * MySQL
     * Oracle
     * SqlServer
+    
+### Future Possibilities
+
+* All queries
+    * Support for mapping composite types (multiple columns per value)
+    * Support for type-casting functions
+    * Support for mapping to non-case classes
+    * Support for correlated subqueries in from clause
+* INSERT queries
+    * Support for DEFAULT column values in the VALUES clause    
+* UPDATE queries
+    * Tighten up type checking for the SET expression (right now, it's just any expression)
