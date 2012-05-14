@@ -412,7 +412,7 @@ db.withConnection { implicit conn =>
 We're now enclosing the entire query expression in parentheses to support breaking it onto multiple lines.
 
 Note how we use the `==` operator instead of `=`.  Other comparison operators are the same as in SQL, namely
-`<>`, `<`, `<=`, `>` and `>=`.
+`<>`, `<`, `<=`, `>`, `>=`, `LIKE` and `ILIKE`.
 
 Of course, we can also select individual columns even when joining.
 
@@ -435,7 +435,7 @@ Query results can be restricted using a WHERE clause.  The syntax for conditions
 in the INNER_JOIN ON clause.
 
 ```scala
-SELECT(db.i.id, db.li.amount)
+SELECT (db.i.id, db.li.amount)
 FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
 WHERE (db.li.amount > db.li.id)
 ```
@@ -443,7 +443,7 @@ WHERE (db.li.amount > db.li.id)
 Conditions are composed using && and || in place of AND and OR.
 
 ```scala
-SELECT(db.i.id, db.li.amount)
+SELECT (db.i.id, db.li.amount)
 FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id && db.li.id <> db.i.id)
 WHERE (db.li.amount > db.li.id || db.li.amount == db.li.amount)
 ```
@@ -451,9 +451,34 @@ WHERE (db.li.amount > db.li.id || db.li.amount == db.li.amount)
 The logical negation operator NOT can be applied to any condition.
 
 ```scala
-SELECT(db.i.id, db.li.amount)
+SELECT (db.i.id, db.li.amount)
 FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
 WHERE (db.li.amount > db.li.id && NOT(db.li.amount <> db.li.amount))
+```
+
+The IN and EXISTS operators are supported as well.
+```
+SELECT (db.i.*)
+FROM db.i
+WHERE (db.i.id IN ?(Seq(1, 2, 3)))
+```
+
+IN can also take a SELECT query.
+```
+SELECT (db.i.*)
+FROM (db.i)
+WHERE (db.i.id IN (SELECT (db.i2.id)
+  FROM (db.i2)
+  WHERE db.i.id == db.i2.id))
+```
+
+EXISTS requires a SELECT query.
+```
+SELECT (db.i.*)
+FROM (db.i)
+WHERE EXISTS (SELECT (db.i2.id)
+  FROM (db.i2)
+  WHERE db.i.id == db.i2.id)
 ```
 
 #### Aggregate Queries
@@ -498,7 +523,7 @@ val query7 = (
 Of course one can bind any valid Scala expression, constant or otherwise.
 
 ```scala
-SELECT(db.i.id, db.li.amount)
+SELECT (db.i.id, db.li.amount)
 FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
 WHERE (db.i.id == ?(5) || db.i.id == ?(5 * 35 + 3))
 ```
@@ -794,7 +819,7 @@ table [INNER_JOIN table ON condition ...]
 
 *condition* is:
 ```
-{ unary_condition | binary_condition | EXPR("custom SQL") } [{ && | || } condition]
+{ unary_condition | binary_condition | in_condition | exists_condition | EXPR("custom SQL") } [{ && | || } condition]
 ```
 
 Any condition can also be negated by using NOT
@@ -809,8 +834,18 @@ scalar_expression { IS_NULL | IS_NOT_NULL }
 
 *binary_condition* is:
 ```
-scalar_expression { == | <> | != | > | >= | < | <= } scalar_expression }
+scalar_expression { == | <> | != | > | >= | < | <= | LIKE | ILIKE } scalar_expression }
 ```
+
+*in_condition* is:
+```
+scalar_value IN { sequence_of_bound_value | select_query }
+```
+
+*exists_condition* is:
+```
+EXISTS select_query
+``` 
 
 ## Roadmap
 
@@ -822,7 +857,6 @@ scalar_expression { == | <> | != | > | >= | < | <= } scalar_expression }
     * Generate scaladoc
 * All queries
     * Make sure we have a proper model for resource cleanup (prepared statements, resultsets, connections)
-    * Add these keywords: LIKE, ILIKE, IN, EXISTS
     * Provide nicer error messages by using @implicitNotFound
     * Support for tables with no primary key
     * Support for tables with multi-column primary keys

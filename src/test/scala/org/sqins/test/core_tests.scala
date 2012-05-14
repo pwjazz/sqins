@@ -258,7 +258,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
 
     query.queryExpression should equal(
       """|SELECT i.id, i.description, i.image, li.id, li.invoice_id, li.amount, li.ts
-           |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id AND NOT i.id <> ?""".stripMargin)
+           |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id AND NOT (i.id <> ?)""".stripMargin)
   }
 
   it should "be able to contain projections along with individual columns" in {
@@ -410,7 +410,67 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
     }
   }
 
-  "A SELECT query" should "allows us to put together aggregations, wheres and all this other stuff and work correctly" in {
+  it should "support an IN clause taking a sequence of bound values" in {
+    val query = (
+      SELECT(i.id)
+      FROM i
+      WHERE (i.id IN ?(Seq(1, 2, 3))))
+    query.queryExpression should equal("""|SELECT i.id
+                                          |FROM invoice AS i
+                                          |WHERE i.id IN (?, ?, ?)""".stripMargin)
+
+    db.withConnection { implicit conn =>
+      query.toList.length should equal(1)
+    }
+  }
+  
+  it should "support an IN clause taking a sequence of values specified against a bound value" in {
+    val seq = Seq(1, 2, 3)
+    val query = (
+      SELECT(i.id)
+      FROM i
+      WHERE (?(1) IN ?(seq)))
+    query.queryExpression should equal("""|SELECT i.id
+                                          |FROM invoice AS i
+                                          |WHERE ? IN (?, ?, ?)""".stripMargin)
+
+    db.withConnection { implicit conn =>
+      query.toList.length should equal(1)
+    }
+  }
+
+  it should "support an IN clause taking a query" in {
+    val query = (
+      SELECT(i.id)
+      FROM i
+      WHERE (i.id IN (SELECT(invoice.id) FROM invoice)))
+    query.queryExpression should equal("""|SELECT i.id
+                                          |FROM invoice AS i
+                                          |WHERE i.id IN (SELECT invoice.id
+                                          |FROM invoice)""".stripMargin)
+
+    db.withConnection { implicit conn =>
+      query.toList.length should equal(1)
+    }
+  }
+
+  it should "support an EXISTS clause taking a query" in {
+    val query = (
+      SELECT(i.id)
+      FROM i
+      WHERE EXISTS(SELECT(invoice.id) FROM invoice WHERE invoice.id == i.id))
+    query.queryExpression should equal("""|SELECT i.id
+                                          |FROM invoice AS i
+                                          |WHERE EXISTS (SELECT invoice.id
+                                          |FROM invoice
+                                          |WHERE invoice.id = i.id)""".stripMargin)
+
+    db.withConnection { implicit conn =>
+      query.toList.length should equal(1)
+    }
+  }
+
+  "A SELECT query" should "allow us to put together aggregations, wheres and all this other stuff and work correctly" in {
     def findLineItemsForInvoice(invoiceId: Long) = (
       SELECT DISTINCT (i.*, li.*, MAX(li.amount) AS "the_max", FN("MIN")(li.amount), ?(5))
       FROM (i INNER_JOIN li ON i.id == li.invoice_id && i.id == li.invoice_id)
@@ -425,7 +485,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
     query.queryExpression should equal(
       """|SELECT DISTINCT i.id, i.description, i.image, li.id, li.invoice_id, li.amount, li.ts, MAX(li.amount) AS the_max, MIN(li.amount), ?
          |FROM invoice AS i INNER JOIN line_item AS li ON i.id = li.invoice_id AND i.id = li.invoice_id
-         |WHERE i.id = ? AND NOT i.id <> ?
+         |WHERE i.id = ? AND NOT (i.id <> ?)
          |GROUP BY i.id, i.description, i.image, li.id, li.invoice_id, li.ts
          |ORDER BY i.id ASC, li.ts DESC
          |LIMIT ?

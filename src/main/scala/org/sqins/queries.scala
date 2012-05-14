@@ -253,7 +253,7 @@ protected class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => 
 /**
  * An INSERT ... VALUES query
  */
-case class InsertValuesQuery[T, +K](into: IntoItem[T, K], values: Seq[BoundValue[_]]) {
+case class InsertValuesQuery[T, K](into: IntoItem[T, K], values: Seq[BoundValue[_]]) {
   def insertExpression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
 
   def apply(implicit conn: Connection): K = {

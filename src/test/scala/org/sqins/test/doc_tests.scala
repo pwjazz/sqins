@@ -241,4 +241,20 @@ object DocCompilationText {
   db.withConnection { implicit conn =>
     val result: java.sql.ResultSet = SQL("SELECT * FROM invoice").executeQuery
   }
+  
+  db.withConnection { implicit conn =>
+    val query = (
+        SELECT (db.i.*)
+        FROM db.i
+        WHERE (db.i.id IN ?(Seq(1, 2, 3))))
+  }
+  
+  db.withConnection { implicit conn =>
+    val query = (
+      SELECT(db.i.*)
+      FROM (db.i)
+      WHERE EXISTS (SELECT(db.i2.id)
+        FROM (db.i2)
+        WHERE db.i.id == db.i2.id))
+  }
 }
