@@ -849,22 +849,16 @@ EXISTS select_query
 
 ## Roadmap
 
-* Documentation
-    * Create user guide
-    * Include survey of other options (ScalaQuery, CircumflexORM, Squeryl)
-    * Improve consistency of parentheses and explain their use
-    * Clean up class and method visibility
-    * Generate scaladoc
 * All queries
     * Make sure we have a proper model for resource cleanup (prepared statements, resultsets, connections)
     * Provide nicer error messages by using @implicitNotFound
     * Support for tables with no primary key
     * Support for tables with multi-column primary keys
-    * Support for mapping composite types (multiple columns per value)
-    * Support for correlated subqueries in from clause
     * Indentation in query output for better readability
+    * Support for mapping composite types (multiple columns per value)
     * Support for type-casting functions???
     * Support for mapping to non-case classes???
+    * Support for correlated subqueries in from clause???
 * INSERT queries
     * Support for DEFAULT column values in the VALUES clause    
 * SELECT queries

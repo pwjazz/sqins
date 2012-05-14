@@ -97,12 +97,12 @@ private[sqins] trait ScalarExpression extends Expression {
 /**
  * A scalar expression that is just a string. Useful for plugging in stuff not natively supported by the syntax.
  */
-case class ConstantScalarExpression(expression: String) extends Condition
+private[sqins] case class ConstantScalarExpression(expression: String) extends Condition
 
 /**
  * A scalar value that is just a string. Useful for plugging in stuff not natively supported by the syntax.
  */
-case class ConstantScalarValue[T](expression: String, typeMapping: TypeMapping[T]) extends ScalarValue[T] {
+private[sqins] case class ConstantScalarValue[T](expression: String, typeMapping: TypeMapping[T]) extends ScalarValue[T] {
   def extract(rs: ResultSet, position: Int) = typeMapping.get(rs, position)
 }
 
@@ -147,7 +147,7 @@ private[sqins] trait ScalarValue[+T] extends ScalarExpression with Extractable[T
 /**
  * A ScalarValue + an operator + a ScalarExpression = a CalculatedValue
  */
-case class CalculatedValue[+T](scalarValue: ScalarValue[T], operator: String, other: ScalarExpression)
+private[sqins] case class CalculatedValue[+T](scalarValue: ScalarValue[T], operator: String, other: ScalarExpression)
     extends ScalarValue[T] {
   override def expression = "%1$s %2$s %3$s".format(scalarValue.expression, operator, other.expression)
 
@@ -199,7 +199,7 @@ object ? {
  * A call to a database function.  The function can take one or more parameters as captured by the params Expression.
  * Only function calls returning a type of value with an in-scope implicit TypeMapping can be made.
  */
-case class FunctionCall[T](name: String, qualifiers: Option[String], params: Expression, typeMapping: TypeMapping[T]) extends ScalarValue[T] {
+private[sqins] case class FunctionCall[T](name: String, qualifiers: Option[String], params: Expression, typeMapping: TypeMapping[T]) extends ScalarValue[T] {
   val expression = qualifiers match {
     case Some(qualifiers: String) => "%1$s(%2$s %3$s)".format(name, qualifiers, params.expression)
     case None                     => "%1$s(%2$s)".format(name, params.expression)
@@ -220,7 +220,7 @@ case class FN(name: String, qualifiers: Option[String] = None) {
 /**
  * Something that can be used as the INTO clause of an INSERT statement.
  */
-trait IntoItem[T, K] {
+private[sqins] trait IntoItem[T, K] {
   def intoExpression: String
 
   def primaryKey: PrimaryKey[K]
@@ -257,7 +257,7 @@ trait IntoItem[T, K] {
 /**
  * An item from which one can select, such as a table, list of tables, joined tables, sub-selects.
  */
-trait FromItem {
+private[sqins] trait FromItem {
   def fromExpression: String
 
   def INNER_JOIN(right: Relation) = IncompleteJoin(this, "INNER JOIN", right)
@@ -266,7 +266,7 @@ trait FromItem {
 /**
  * A Join that is missing the join condition
  */
-case class IncompleteJoin(left: FromItem, joinType: String, right: Relation) {
+private[sqins] case class IncompleteJoin(left: FromItem, joinType: String, right: Relation) {
   /**
    * Add the join condition.
    */
@@ -276,14 +276,14 @@ case class IncompleteJoin(left: FromItem, joinType: String, right: Relation) {
 /**
  * A FromItem representing a join.
  */
-case class Join(left: FromItem, joinType: String, right: Relation, on: Condition) extends FromItem {
+private[sqins] case class Join(left: FromItem, joinType: String, right: Relation, on: Condition) extends FromItem {
   def fromExpression = "%1$s %2$s %3$s ON %4$s".format(left.fromExpression, joinType, right.fromExpression, on.expression)
 }
 
 /**
  * A named list of columns (table, alias, etc.)
  */
-abstract class Relation(val name: String) extends FromItem {
+private[sqins] abstract class Relation(val name: String) extends FromItem {
   /**
    * An optional alias for this Relation.
    */
@@ -313,7 +313,7 @@ abstract class Relation(val name: String) extends FromItem {
 /**
  * Definition of a Table, including its name and columns.
  */
-abstract class Table[T: Manifest, K](override val name: String) extends Relation(name) with IntoItem[T, K] {
+private[sqins] abstract class Table[T: Manifest, K](override val name: String) extends Relation(name) with IntoItem[T, K] {
   val rowType = manifest[T]
   private var _primaryKey: PrimaryKey[K] = null
 
@@ -383,7 +383,7 @@ abstract class Table[T: Manifest, K](override val name: String) extends Relation
 /**
  * Represents the primary key of a table.  Currently only 1 column - hopefully eventually we'll support multiple.
  */
-case class PrimaryKey[K](column: ColumnDef[K, _ <: Relation]) extends Extractable[K] with Expression {
+private[sqins] case class PrimaryKey[K](column: ColumnDef[K, _ <: Relation]) extends Extractable[K] with Expression {
   def expression = column.expression
 
   def extract(rs: ResultSet, position: Int) = column.extract(rs, position)
@@ -394,7 +394,7 @@ case class PrimaryKey[K](column: ColumnDef[K, _ <: Relation]) extends Extractabl
 /**
  * An INSERT INTO clause with a restricted list of columns.
  */
-case class IntoWithSpecificColumns[T, K](table: Table[T, K], columns: Seq[ColumnDef[_, _]]) extends IntoItem[T, K] {
+private[sqins] case class IntoWithSpecificColumns[T, K](table: Table[T, K], columns: Seq[ColumnDef[_, _]]) extends IntoItem[T, K] {
   def intoExpression = "%1$s (%2$s)".format(table.name, columns.map(_.name).mkString(", "))
 
   def primaryKey = table.primaryKey
@@ -407,7 +407,7 @@ case class IntoWithSpecificColumns[T, K](table: Table[T, K], columns: Seq[Column
 /**
  * A column in a Relation.
  */
-case class ColumnDef[T, R <: Relation](name: String, isAutoGenerated: Boolean = false)(implicit relation: R, typeMapping: TypeMapping[T]) extends ScalarValue[T] {
+private[sqins] case class ColumnDef[T, R <: Relation](name: String, isAutoGenerated: Boolean = false)(implicit relation: R, typeMapping: TypeMapping[T]) extends ScalarValue[T] {
   /**
    * Alias this column to the given Relation.
    */
@@ -433,7 +433,7 @@ case class ColumnDef[T, R <: Relation](name: String, isAutoGenerated: Boolean = 
 /**
  * An expression setting a column equal to a scalar value.
  */
-case class SetExpression[T, R <: Relation](column: ColumnDef[T, R], value: ScalarValue[T]) extends Expression {
+private[sqins] case class SetExpression[T, R <: Relation](column: ColumnDef[T, R], value: ScalarValue[T]) extends Expression {
   def expression = "%1$s = %2$s".format(column.name, value.expression)
 
   override def boundValues = value.boundValues
@@ -442,7 +442,7 @@ case class SetExpression[T, R <: Relation](column: ColumnDef[T, R], value: Scala
 /**
  * An expression for setting all non-autogenerated fields of a row in an UPDATE query.
  */
-case class SetRowExpression[T, K](table: Table[T, K], row: T) extends Expression {
+private[sqins] case class SetRowExpression[T, K](table: Table[T, K], row: T) extends Expression {
   def expression = table.nonAutoGeneratedColumns.map { column => "%1$s = ?".format(column.name) }.mkString(", ")
 
   override def boundValues = table.rowToBoundValues(row)
@@ -451,7 +451,7 @@ case class SetRowExpression[T, K](table: Table[T, K], row: T) extends Expression
 /**
  * Represents all columns of a table in a SELECT clause.
  */
-case class Projection[T, K](table: Table[T, K]) extends ScalarValue[T] {
+private[sqins] case class Projection[T, K](table: Table[T, K]) extends ScalarValue[T] {
   def expression = table.columns.map { column => column.expression }.mkString(", ")
 
   override def selectExpression = table.columns.map { column => column.selectExpression }.mkString(", ")
@@ -488,7 +488,7 @@ case class Projection[T, K](table: Table[T, K]) extends ScalarValue[T] {
 /**
  * An expression that evaluates to a boolean like A = B, A <> B, A IS NULL, etc.
  */
-trait Condition extends ScalarExpression {
+private[sqins] trait Condition extends ScalarExpression {
   def &&(right: Condition) = CompoundCondition(this, "AND", right)
 
   def ||(right: Condition) = CompoundCondition(this, "OR", right)
@@ -497,34 +497,34 @@ trait Condition extends ScalarExpression {
 /**
  * A condition based on a single expression.
  */
-abstract class ScalarCondition(val value: ScalarExpression) extends Condition {
+private[sqins] abstract class ScalarCondition(val value: ScalarExpression) extends Condition {
   override def boundValues = value.boundValues
 }
 
 /**
  * A condition based on two expressions and an operator
  */
-abstract class BinaryCondition(val left: Expression, val operator: String, val right: Expression) extends Condition {
+private[sqins] abstract class BinaryCondition(val left: Expression, val operator: String, val right: Expression) extends Condition {
   val expression = "%1$s %2$s %3$s".format(left.expression, operator, right.expression)
 
   override def boundValues = left.boundValues ++ right.boundValues
 }
 
-case class Null(override val value: ScalarExpression) extends ScalarCondition(value) {
+private[sqins] case class Null(override val value: ScalarExpression) extends ScalarCondition(value) {
   val expression = "%1$s IS NULL".format(value.expression)
 }
 
-case class NotNull(override val value: ScalarExpression) extends ScalarCondition(value) {
+private[sqins] case class NotNull(override val value: ScalarExpression) extends ScalarCondition(value) {
   val expression = "%1$s IS NOT NULL".format(value.expression)
 }
 
-case class InSelectQueryCondition[T](value: ScalarValue[T], query: SelectQuery[T]) extends Condition {
+private[sqins] case class InSelectQueryCondition[T](value: ScalarValue[T], query: SelectQuery[T]) extends Condition {
   val expression = "%1$s IN %2$s".format(value.expression, query.expression)
   
   override def boundValues = value.boundValues ++ query.boundValues
 }
   
-case class InSequenceCondition[T](value: ScalarValue[T], vals: Seq[BoundValue[T]]) extends Condition {
+private[sqins] case class InSequenceCondition[T](value: ScalarValue[T], vals: Seq[BoundValue[T]]) extends Condition {
   val expression = "%1$s IN (%2$s)".format(value.expression, vals.map { _ => "?"}.mkString(", "))
   
   override def boundValues = value.boundValues ++ vals
@@ -539,23 +539,19 @@ case class EXISTS[T](query: SelectQuery[T]) extends Condition {
 /**
  * Logically negates a given condition.
  */
-class NOT(val condition: Condition) extends Condition {
+case class NOT(val condition: Condition) extends Condition {
   val expression = "NOT (%1$s)".format(condition.expression)
   
   override def boundValues = condition.boundValues
 }
 
-object NOT {
-  def apply(value: Condition) = new NOT(value)
-}
+private[sqins] case class Comparison[T](override val left: ScalarExpression, comparison: String, override val right: ScalarExpression) extends BinaryCondition(left, comparison, right)
 
-case class Comparison[T](override val left: ScalarExpression, comparison: String, override val right: ScalarExpression) extends BinaryCondition(left, comparison, right)
-
-case class CompoundCondition[T](override val left: Condition, composition: String, override val right: Condition) extends BinaryCondition(left, composition, right)
+private[sqins] case class CompoundCondition[T](override val left: Condition, composition: String, override val right: Condition) extends BinaryCondition(left, composition, right)
 
 /**
  * A sorted ScalarExpression.
  */
-case class SortedExpression(left: ScalarExpression, sort: String) extends Expression {
+private[sqins] case class SortedExpression(left: ScalarExpression, sort: String) extends Expression {
   def expression = "%1$s %2$s".format(left.expression, sort)
 }

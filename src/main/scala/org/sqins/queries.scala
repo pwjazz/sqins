@@ -75,20 +75,20 @@ case class SQL(query: String, params: Seq[BoundValue[_]] = Seq()) {
 /**
  * An error that occurred while processing SQL.
  */
-class SQLError(sql: SQL, cause: Exception) extends RuntimeException("Error executing SQL \"%1$s\" with params (%2$s) failed: %3$s".
+private[sqins] class SQLError(sql: SQL, cause: Exception) extends RuntimeException("Error executing SQL \"%1$s\" with params (%2$s) failed: %3$s".
   format(sql.query, sql.params.map(_.actual).mkString(", "), cause.getMessage), cause)
 
 /**
  * A SELECT query missing its FROM clause.
  */
-case class IncompleteSelectQuery[T](select: Extractable[T] with Expression, distinct: Boolean) {
+private[sqins] case class IncompleteSelectQuery[T](select: Extractable[T] with Expression, distinct: Boolean) {
   def FROM(from: FromItem) = SelectQuery(select, distinct, from)
 }
 
 /**
  * Base class for all variants of SELECT query, including SELECT and INSERT INTO ... SELECT ...
  */
-trait BaseSelectQuery[T] extends ScalarExpression with Extractable[T] {
+private[sqins] trait BaseSelectQuery[T] extends ScalarExpression with Extractable[T] {
   def select: Extractable[T] with Expression
   def distinct: Boolean
   def from: FromItem
@@ -175,7 +175,7 @@ trait BaseSelectQuery[T] extends ScalarExpression with Extractable[T] {
 /**
  * A SELECT query that can be executed as a function.
  */
-case class SelectQuery[T](select: Extractable[T] with Expression,
+private[sqins] case class SelectQuery[T](select: Extractable[T] with Expression,
                           distinct: Boolean,
                           from: FromItem,
                           where: Option[Condition] = None,
@@ -226,11 +226,11 @@ object SELECT {
 /**
  * The result of executing a SELECT query.
  */
-class SelectResult[T](rs: ResultSet, rowReader: (ResultSet => T)) extends Iterable[T] {
+private[sqins] class SelectResult[T](rs: ResultSet, rowReader: (ResultSet => T)) extends Iterable[T] {
   def iterator = new SelectResultIterator(rs, rowReader)
 }
 
-protected class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => T)) extends Iterator[T] {
+private[sqins] protected class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => T)) extends Iterator[T] {
   private var needsRead = true
 
   def hasNext = {
@@ -253,7 +253,7 @@ protected class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => 
 /**
  * An INSERT ... VALUES query
  */
-case class InsertValuesQuery[T, K](into: IntoItem[T, K], values: Seq[BoundValue[_]]) {
+private[sqins] case class InsertValuesQuery[T, K](into: IntoItem[T, K], values: Seq[BoundValue[_]]) {
   def insertExpression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
 
   def apply(implicit conn: Connection): K = {
@@ -274,14 +274,14 @@ case class InsertValuesQuery[T, K](into: IntoItem[T, K], values: Seq[BoundValue[
 /**
  * An INSERT INTO ... SELECT ... FROM query without the FROM clause
  */
-case class IncompleteInsertSelectQuery[T, T2](into: IntoItem[_, _], select: Extractable[T] with Expression, distinct: Boolean) {
+private[sqins] case class IncompleteInsertSelectQuery[T, T2](into: IntoItem[_, _], select: Extractable[T] with Expression, distinct: Boolean) {
   def FROM(from: FromItem) = InsertSelectQuery(into, select, distinct, from)
 }
 
 /**
  * An INSERT INTO ... SELECT ... FROM query
  */
-case class InsertSelectQuery[T](into: IntoItem[_, _],
+private[sqins] case class InsertSelectQuery[T](into: IntoItem[_, _],
                                 select: Extractable[T] with Expression,
                                 distinct: Boolean,
                                 from: FromItem,
@@ -335,13 +335,13 @@ object INSERT {
   def INTO[T, K](into: IntoItem[T, K]) = into
 }
 
-case class IncompleteUpdateQuery[T](table: Table[T, _]) {
+private[sqins] case class IncompleteUpdateQuery[T](table: Table[T, _]) {
   def SET(set: Expression) = UpdateQuery(table, set)
 
   def SET(row: T) = UpdateQuery(table, table.setExpression(row), Some(table.primaryKey == row))
 }
 
-case class UpdateQuery[T](table: Table[T, _], set: Expression, where: Option[Condition] = None) {
+private[sqins] case class UpdateQuery[T](table: Table[T, _], set: Expression, where: Option[Condition] = None) {
   def WHERE(where: Condition) = UpdateQuery(table, set, Some(where))
 
   def baseExpression = "UPDATE %1$s\nSET %2$s".format(table.fromExpression, set.expression)
@@ -369,7 +369,7 @@ object UPDATE {
   def apply[T](table: Table[T, _]) = IncompleteUpdateQuery(table)
 }
 
-case class DeleteQuery[T](table: Table[T, _], where: Option[Condition] = None) {
+private[sqins] case class DeleteQuery[T](table: Table[T, _], where: Option[Condition] = None) {
   def WHERE(where: Condition) = DeleteQuery(table, Some(where))
 
   def baseExpression = "DELETE FROM %1$s".format(table.fromExpression)
