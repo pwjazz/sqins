@@ -313,7 +313,7 @@ private[sqins] abstract class Relation(val name: String) extends FromItem {
 /**
  * Definition of a Table, including its name and columns.
  */
-private[sqins] abstract class Table[T: Manifest, K](override val name: String) extends Relation(name) with IntoItem[T, K] {
+abstract class Table[T: Manifest, K](override val name: String) extends Relation(name) with IntoItem[T, K] {
   val rowType = manifest[T]
   private var _primaryKey: PrimaryKey[K] = null
 
