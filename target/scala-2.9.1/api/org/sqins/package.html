@@ -1,0 +1,248 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html>
+        <head>
+          <title>org.sqins</title>
+          <meta http-equiv="content-type" content="text/html; charset=UTF-8" />
+          
+      <link type="text/css" media="screen" rel="stylesheet" href="../../lib/template.css" />
+      <script type="text/javascript" src="../../lib/jquery.js"></script>
+      <script type="text/javascript" src="../../lib/jquery-ui.js"></script>
+      <script type="text/javascript" src="../../lib/template.js"></script>
+      <script type="text/javascript" src="../../lib/tools.tooltip.js"></script>
+    
+        </head>
+        <body class="value">
+      <div id="definition">
+        <img src="../../lib/package_big.png" />
+        <p id="owner"><a name="org" class="extype" href="../package.html">org</a></p>
+        <h1>sqins</h1>
+      </div>
+
+      <h4 class="signature" id="signature">
+      <span class="kind">package</span>
+      <span class="symbol"> 
+        <span class="name">sqins</span>
+        
+        
+      </span>
+      </h4>
+      
+          <div class="fullcommenttop" id="comment"></div>
+        
+
+      <div id="template">
+
+        <div id="mbrsel">
+          <div id="textfilter"><span class="pre"></span><span class="input"><input accesskey="/" type="text" /></span><span class="post"></span></div>
+          
+          
+          <div id="visbl">
+              <span class="filtertype">Visibility</span>
+              <ol><li class="public in"><span>Public</span></li><li class="all out"><span>All</span></li></ol>
+            </div>
+        </div>
+
+        
+
+        <div class="types members" id="types">
+              <h3>Type Members</h3>
+              <ol><li visbl="pub" name="org.sqins.Database" data-isabs="true">
+      <a id="Database:Database"></a>
+      <h4 class="signature">
+      <span class="kind">trait</span>
+      <span class="symbol"> 
+        <a href="Database.html"><span class="name">Database</span></a>
+        
+        <span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Trait for setting up Database objects that support working with implicit connections.</p>
+    </li><li visbl="pub" name="org.sqins.EXISTS" data-isabs="false">
+      <a id="EXISTS:EXISTS[T]"></a>
+      <h4 class="signature">
+      <span class="kind">case class</span>
+      <span class="symbol"> 
+        <a href="EXISTS.html"><span class="name">EXISTS</span></a>
+        <span class="tparams">[<span name="T">T</span>]</span>
+        <span class="params">(<span name="query">query: SelectQuery[T]</span>)</span><span class="result"> extends Condition with Product with Serializable</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="org.sqins.FN" data-isabs="false">
+      <a id="FN:FN"></a>
+      <h4 class="signature">
+      <span class="kind">case class</span>
+      <span class="symbol"> 
+        <a href="FN.html"><span class="name">FN</span></a>
+        
+        <span class="params">(<span name="name">name: String</span>, <span name="qualifiers">qualifiers: Option[String]</span>)</span><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Constructs FunctionCalls from expressions and scalar values.</p>
+    </li><li visbl="pub" name="org.sqins.NOT" data-isabs="false">
+      <a id="NOT:NOT"></a>
+      <h4 class="signature">
+      <span class="kind">case class</span>
+      <span class="symbol"> 
+        <a href="NOT.html"><span class="name">NOT</span></a>
+        
+        <span class="params">(<span name="condition">condition: Condition</span>)</span><span class="result"> extends Condition with Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Logically negates a given condition.</p>
+    </li><li visbl="pub" name="org.sqins.OptionTypeMapping" data-isabs="false">
+      <a id="OptionTypeMapping:OptionTypeMapping[T]"></a>
+      <h4 class="signature">
+      <span class="kind">class</span>
+      <span class="symbol"> 
+        <a href="OptionTypeMapping.html"><span class="name">OptionTypeMapping</span></a>
+        <span class="tparams">[<span name="T">T</span>]</span>
+        <span class="result"> extends TypeMapping[Option[T]]</span>
+      </span>
+      </h4>
+      <p class="comment cmt">OptionTypeMapping is a specialization of TypeMapping that handles Option values, delegating to a regular TypeMapping
+to perform the actual getting and setting.</p>
+    </li><li visbl="pub" name="org.sqins.SQL" data-isabs="false">
+      <a id="SQL:SQL"></a>
+      <h4 class="signature">
+      <span class="kind">case class</span>
+      <span class="symbol"> 
+        <a href="SQL.html"><span class="name">SQL</span></a>
+        
+        <span class="params">(<span name="query">query: String</span>, <span name="params">params: Seq[org.sqins.BoundValue[_]]</span>)</span><span class="result"> extends Product with Serializable</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A generic SQL query that takes a text query and an optional seq of parameters.</p>
+    </li><li visbl="prt" name="org.sqins.SelectResultIterator" data-isabs="false">
+      <a id="SelectResultIterator:SelectResultIterator[T]"></a>
+      <h4 class="signature">
+      <span class="kind">class</span>
+      <span class="symbol"> 
+        <a href="SelectResultIterator.html"><span class="name">SelectResultIterator</span></a>
+        <span class="tparams">[<span name="T">T</span>]</span>
+        <span class="result"> extends Iterator[T]</span>
+      </span>
+      </h4>
+      <div class="fullcomment"><dl class="attributes block"> <dt>Attributes</dt><dd>protected </dd></dl></div>
+    </li><li visbl="pub" name="org.sqins.TypeMapping" data-isabs="true">
+      <a id="TypeMapping:TypeMapping[T]"></a>
+      <h4 class="signature">
+      <span class="kind">trait</span>
+      <span class="symbol"> 
+        <a href="TypeMapping.html"><span class="name">TypeMapping</span></a>
+        <span class="tparams">[<span name="T">T</span>]</span>
+        <span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">A TypeMapping handles retrieving a Field's value from a ResultSet and for setting parameters on a PreparedStatement.</p>
+    </li></ol>
+            </div>
+        
+        
+
+        <div class="values members" id="values">
+              <h3>Value Members</h3>
+              <ol><li visbl="pub" name="org.sqins.?" data-isabs="false">
+      <a id="?:?"></a>
+      <h4 class="signature">
+      <span class="kind">object</span>
+      <span class="symbol"> 
+        <a href="$qmark$.html"><span class="name">?</span></a>
+        
+        <span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Bind a value.</p>
+    </li><li visbl="pub" name="org.sqins.DELETE" data-isabs="false">
+      <a id="DELETE:DELETE"></a>
+      <h4 class="signature">
+      <span class="kind">object</span>
+      <span class="symbol"> 
+        <a href="DELETE$.html"><span class="name">DELETE</span></a>
+        
+        <span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="org.sqins.EXPR" data-isabs="false">
+      <a id="EXPR:EXPR"></a>
+      <h4 class="signature">
+      <span class="kind">object</span>
+      <span class="symbol"> 
+        <a href="EXPR$.html"><span class="name">EXPR</span></a>
+        
+        <span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Factory for ConstantScalarExpressions
+</p>
+    </li><li visbl="pub" name="org.sqins.INSERT" data-isabs="false">
+      <a id="INSERT:INSERT"></a>
+      <h4 class="signature">
+      <span class="kind">object</span>
+      <span class="symbol"> 
+        <a href="INSERT$.html"><span class="name">INSERT</span></a>
+        
+        <span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Syntax support for building InsertQueries using the INSERT keyword.</p>
+    </li><li visbl="pub" name="org.sqins.Implicits" data-isabs="false">
+      <a id="Implicits:Implicits"></a>
+      <h4 class="signature">
+      <span class="kind">object</span>
+      <span class="symbol"> 
+        <a href="Implicits$.html"><span class="name">Implicits</span></a>
+        
+        <span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Pre-defined implicit type mappings and other implicit conversions.</p>
+    </li><li visbl="pub" name="org.sqins.SELECT" data-isabs="false">
+      <a id="SELECT:SELECT"></a>
+      <h4 class="signature">
+      <span class="kind">object</span>
+      <span class="symbol"> 
+        <a href="SELECT$.html"><span class="name">SELECT</span></a>
+        
+        <span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Syntax support for building SelectQuerys using the SELECT keyword.</p>
+    </li><li visbl="pub" name="org.sqins.UPDATE" data-isabs="false">
+      <a id="UPDATE:UPDATE"></a>
+      <h4 class="signature">
+      <span class="kind">object</span>
+      <span class="symbol"> 
+        <a href="UPDATE$.html"><span class="name">UPDATE</span></a>
+        
+        <span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      
+    </li><li visbl="pub" name="org.sqins.VEXPR" data-isabs="false">
+      <a id="VEXPR:VEXPR"></a>
+      <h4 class="signature">
+      <span class="kind">object</span>
+      <span class="symbol"> 
+        <a href="VEXPR$.html"><span class="name">VEXPR</span></a>
+        
+        <span class="result"> extends AnyRef</span>
+      </span>
+      </h4>
+      <p class="comment cmt">Factory for ConstantScalarValues
+</p>
+    </li></ol>
+            </div>
+
+        
+
+        
+
+      </div>
+      
+      <div id="tooltip"></div>
+      
+    </body>
+      </html>
