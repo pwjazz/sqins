@@ -227,7 +227,7 @@ sqins includes TypeMappings for the following Scala types (and their related Opt
 `scala.math.BigDecimal`  
 `java.sql.Date`  
 `java.sql.Timestamp`  
-`java.util.UUID` (mapped to String)
+`java.util.UUID` (mapped to String)  
 `Array[Byte]`  
 
 #### Defining Custom TypeMappings
