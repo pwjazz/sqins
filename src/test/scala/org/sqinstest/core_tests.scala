@@ -69,11 +69,12 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
 
   var insertedInvoiceId: Long = null.asInstanceOf[Long]
 
-  "The INSERT function" should "be able to construct an insert query using full table names and specific columns" in {
+  "The INSERT function" should "be able to construct an insert query using full table names and specific columns, and return any and all columns from the table" in {
     // Define some query builder methods
     def insertInvoice(invoice: Invoice) = (
       INSERT INTO i(i.description)
-      VALUES (?(invoice.description)))
+      VALUES (?(invoice.description))
+      RETURNING (i.id))
 
     val invoice = Invoice(description = "An invoice")
     db.withConnection { implicit conn =>
@@ -107,6 +108,24 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
 
     db.withConnection { implicit conn =>
       query(conn) should equal(0)
+    }
+  }
+
+  it should "also allow INSERT ... SELECT FROM ... RETURNING" in {
+    val query = (INSERT INTO invoice(invoice.description, invoice.image)
+      SELECT (invoice.description, invoice.image)
+      FROM invoice
+      WHERE invoice.id == ?(-1)
+      RETURNING invoice.*)
+
+    query.insertExpression should equal("""|INSERT INTO invoice (description, image)
+                                          |SELECT invoice.description, invoice.image
+                                          |FROM invoice
+                                          |WHERE invoice.id = ?
+                                          |RETURNING invoice.id, invoice.description, invoice.image""".stripMargin)
+
+    db.withConnection { implicit conn =>
+      query.toList.length should equal(0)
     }
   }
 
@@ -148,13 +167,34 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
   it should "allow setting whole rows" in {
     val newLineItem = LineItem(id = 1, invoice_id = 1, amount = 56.78)
 
-    val query = UPDATE(li) SET (newLineItem)
+    val query = UPDATE(li) SET (newLineItem) WHERE (li.id == ?(newLineItem.id))
 
     query.updateExpression should equal("""|UPDATE line_item AS li
                                      |SET invoice_id = ?, amount = ?
                                      |WHERE li.id = ?""".stripMargin)
     db.withConnection { implicit conn =>
       query(conn) should equal(1)
+    }
+  }
+
+  it should "support a RETURNING clause" in {
+    val newLineItem = LineItem(id = 1, invoice_id = 1, amount = 56.78)
+
+    val query = (
+      UPDATE(li)
+      SET (newLineItem)
+      WHERE li.id == ?(newLineItem.id)
+      RETURNING li.*)
+
+    query.updateExpression should equal("""|UPDATE line_item AS li
+                                     |SET invoice_id = ?, amount = ?
+                                     |WHERE li.id = ?
+                                     |RETURNING li.id, li.invoice_id, li.amount, li.ts""".stripMargin)
+
+    db.withConnection { implicit conn =>
+      query.foreach { updated =>
+        updated.amount should equal(56.78)
+      }
     }
   }
 
@@ -423,7 +463,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       query.toList.length should equal(1)
     }
   }
-  
+
   it should "support an IN clause taking a sequence of values specified against a bound value" in {
     val seq = Seq(1, 2, 3)
     val query = (
@@ -544,6 +584,15 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       val query = DELETE FROM line_item
       query.deleteExpression should equal("DELETE FROM line_item")
       query.go should equal(1)
+    }
+  }
+  
+  it should "support a RETURNING clause" in {
+    db.withConnection { implicit conn =>
+      val query = DELETE FROM li RETURNING li.id
+      query.deleteExpression should equal("""|DELETE FROM line_item AS li
+                                             |RETURNING li.id""".stripMargin)
+      val deleted:SelectResult[Long] = query go
     }
   }
 

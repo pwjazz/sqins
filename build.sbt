@@ -16,6 +16,8 @@ licenses := Seq("BSD-style" -> url("https://github.com/pwjazz/sqins/blob/master/
 
 homepage := Some(url("http://www.sqins.org"))
 
+scalacOptions ++= Seq("-deprecation", "-unchecked")
+
 libraryDependencies ++= Seq(
   "org.scalatest" %% "scalatest" % "1.6.1" % "test",
   "postgresql" % "postgresql" % "9.1-901.jdbc4" % "test"

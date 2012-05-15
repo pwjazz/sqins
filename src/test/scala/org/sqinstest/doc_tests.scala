@@ -184,19 +184,30 @@ object DocCompilationText {
     GROUP_BY (db.i.id))
 
   db.withConnection { implicit conn =>
-    val insertedKey: Long = INSERT INTO db.invoice(db.invoice.description) VALUES (?("My Description"))
+    val rowsInserted: Int = INSERT INTO db.invoice(db.invoice.description) VALUES (?("My Description"))
   }
 
   val newInvoice = Invoice(description = "My Description")
 
   db.withConnection { implicit conn =>
-    val insertedKey: Long = INSERT INTO db.invoice VALUES (newInvoice)
+    val rowsInserted: Int = INSERT INTO db.invoice VALUES (newInvoice)
+  }
+
+  db.withConnection { implicit conn =>
+    val insertedKey: Long = INSERT INTO db.invoice(db.invoice.description) VALUES (?("My Description")) RETURNING db.invoice.id
   }
 
   db.withConnection { implicit conn =>
     val numberOfInsertedRows: Int = (
       INSERT INTO db.invoice(db.invoice.description)
       SELECT (db.invoice.description) FROM db.invoice)
+  }
+
+  db.withConnection { implicit conn =>
+    val insertedIds: SelectResult[Long] = (
+      INSERT INTO db.invoice(db.invoice.description)
+      SELECT (db.invoice.description) FROM db.invoice
+      RETURNING db.invoice.id)
   }
 
   db.withConnection { implicit conn =>
@@ -224,9 +235,24 @@ object DocCompilationText {
   }
 
   db.withConnection { implicit conn =>
+    val updatedRows: SelectResult[Invoice] = (
+      UPDATE(db.invoice)
+      SET (db.invoice.description := ?("New description"))
+      WHERE (db.invoice.id <= ?(5))
+      RETURNING db.invoice.*)
+  }
+
+  db.withConnection { implicit conn =>
     val numberOfUpdatedRows: Int = (
       DELETE FROM db.invoice
       WHERE (db.invoice.id <= ?(5)))
+  }
+
+  db.withConnection { implicit conn =>
+    val updatedIds: SelectResult[Long] = (
+      DELETE FROM db.invoice
+      WHERE (db.invoice.id <= ?(5))
+      RETURNING db.invoice.id)
   }
 
   (
@@ -235,25 +261,27 @@ object DocCompilationText {
     WHERE (db.i.id == (SELECT(MAX(db.li.invoice_id)) FROM db.li)))
 
   db.withConnection { implicit conn =>
-    val numberOfUpdatedRows: Int = SQL("DELETE FROM invoice WHERE id <= ?", ?(5)).executeUpdate
+    val ps: java.sql.PreparedStatement = SQL("DELETE FROM invoice WHERE id <= ?", ?(5)).executeUpdate
+    val rowsInserted: Int = ps.getUpdateCount()
   }
 
   db.withConnection { implicit conn =>
-    val result: java.sql.ResultSet = SQL("SELECT * FROM invoice").executeQuery
+    val ps: java.sql.PreparedStatement = SQL("SELECT * FROM invoice").executeQuery
+    val rs: java.sql.ResultSet = ps.getResultSet()
   }
-  
+
   db.withConnection { implicit conn =>
     val query = (
-        SELECT (db.i.*)
-        FROM db.i
-        WHERE (db.i.id IN ?(Seq(1, 2, 3))))
+      SELECT(db.i.*)
+      FROM db.i
+      WHERE (db.i.id IN ?(Seq(1, 2, 3))))
   }
-  
+
   db.withConnection { implicit conn =>
     val query = (
       SELECT(db.i.*)
       FROM (db.i)
-      WHERE EXISTS (SELECT(db.i2.id)
+      WHERE EXISTS(SELECT(db.i2.id)
         FROM (db.i2)
         WHERE db.i.id == db.i2.id))
   }

@@ -35,29 +35,21 @@ import java.sql.ResultSet
  * A generic SQL query that takes a text query and an optional seq of parameters.
  */
 case class SQL(query: String, params: Seq[BoundValue[_]] = Seq()) {
-  def executeUpdate(implicit conn: Connection) = {
+  def executeQuery(implicit conn: Connection) = {
     val ps = conn.prepareStatement(query)
     try {
-      buildStatement(ps).executeUpdate
-    } catch {
-      case e: Exception => throw new SQLError(this, e)
-    }
-  }
-
-  def executeInsert(implicit conn: Connection) = {
-    val ps = conn.prepareStatement(query, java.sql.Statement.RETURN_GENERATED_KEYS)
-    try {
-      buildStatement(ps).executeUpdate
+      buildStatement(ps).executeQuery
       ps
     } catch {
       case e: Exception => throw new SQLError(this, e)
     }
   }
 
-  def executeQuery(implicit conn: Connection) = {
+  def executeUpdate(implicit conn: Connection) = {
     val ps = conn.prepareStatement(query)
     try {
-      buildStatement(ps).executeQuery
+      buildStatement(ps).executeUpdate
+      ps
     } catch {
       case e: Exception => throw new SQLError(this, e)
     }
@@ -124,12 +116,12 @@ private[sqins] trait BaseSelectQuery[T] extends ScalarExpression with Extractabl
     }
 
     limit match {
-      case Some(limit: BoundValue[Long]) => expression = "%1$s\nLIMIT ?".format(expression)
+      case Some(limit: BoundValue[_]) => expression = "%1$s\nLIMIT ?".format(expression)
       case None                          => // ignore
     }
 
     offset match {
-      case Some(offset: BoundValue[Long]) => expression = "%1$s\nOFFSET ?".format(expression)
+      case Some(offset: BoundValue[_]) => expression = "%1$s\nOFFSET ?".format(expression)
       case None                           => // ignore
     }
 
@@ -158,12 +150,12 @@ private[sqins] trait BaseSelectQuery[T] extends ScalarExpression with Extractabl
     }
 
     limit match {
-      case Some(limit: BoundValue[Long]) => boundValues ++= Seq(limit)
+      case Some(limit: BoundValue[_]) => boundValues ++= Seq(limit)
       case None                          => // ignore
     }
 
     offset match {
-      case Some(offset: BoundValue[Long]) => boundValues ++= Seq(offset)
+      case Some(offset: BoundValue[_]) => boundValues ++= Seq(offset)
       case None                           => // ignore
     }
     boundValues
@@ -226,11 +218,12 @@ object SELECT {
 /**
  * The result of executing a SELECT query.
  */
-class SelectResult[T](rs: ResultSet, rowReader: (ResultSet => T)) extends Iterable[T] {
-  def iterator = new SelectResultIterator(rs, rowReader)
+class SelectResult[T](ps: PreparedStatement, rowReader: (ResultSet => T)) extends Iterable[T] {
+  def iterator = new SelectResultIterator(ps, rowReader)
 }
 
-protected class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => T)) extends Iterator[T] {
+protected class SelectResultIterator[T](ps: PreparedStatement, rowReader: (ResultSet => T)) extends Iterator[T] {
+  private val rs = ps.getResultSet()
   private var needsRead = true
 
   def hasNext = {
@@ -240,8 +233,13 @@ protected class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => 
   }
 
   def next = rowReader(rs)
-  
+
   override protected def finalize(): Unit = {
+    try {
+      ps.close()
+    } catch {
+      case e: Throwable => // ignore
+    }
     try {
       rs.close()
     } catch {
@@ -253,16 +251,44 @@ protected class SelectResultIterator[T](rs: ResultSet, rowReader: (ResultSet => 
 /**
  * An INSERT ... VALUES query
  */
-case class InsertValuesQuery[T, K](into: IntoItem[T, K], values: Seq[BoundValue[_]]) {
+case class InsertValuesQuery[T](into: IntoItem[T], values: Seq[BoundValue[_]]) {
   def insertExpression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
 
-  def apply(implicit conn: Connection): K = {
-    val ps = SQL(insertExpression, values).executeInsert(conn)
-    val generatedKeys = ps.getGeneratedKeys
-    if (generatedKeys.next) {
-      into.primaryKey.extract(generatedKeys, 1).value
-    } else {
-      throw new Error("Inserting value failed for query: %1$s with values %2$s".format(insertExpression, values.mkString(", ")))
+  def RETURNING[R](returning: Extractable[R] with Expression) = InsertValuesQueryReturning(this, returning)
+
+  def apply(implicit conn: Connection): Int = {
+    val ps = SQL(insertExpression, values).executeUpdate(conn)
+    ps.getUpdateCount()
+  }
+
+  def go(implicit conn: Connection) = apply(conn)
+
+  override def toString = insertExpression
+}
+
+case class InsertValuesQueryReturning[T, R](query: InsertValuesQuery[T], returning: Extractable[R] with Expression) {
+  def insertExpression = "%1$s\nRETURNING %2$s".format(query.insertExpression, returning.unaliasedExpression)
+
+  def apply(implicit conn: Connection): R = {
+    val ps = SQL(insertExpression, query.values ++ returning.boundValues).executeQuery(conn)
+    try {
+      val rs = ps.getResultSet()
+      try {
+        rs.next()
+        returning.extract(rs, 1).value
+      } finally {
+        try {
+          rs.close()
+        } catch {
+          case e: Throwable => // ignore
+        }
+      }
+    } finally {
+      try {
+        ps.close()
+      } catch {
+        case e: Throwable => // ignore
+      }
     }
   }
 
@@ -274,14 +300,14 @@ case class InsertValuesQuery[T, K](into: IntoItem[T, K], values: Seq[BoundValue[
 /**
  * An INSERT INTO ... SELECT ... FROM query without the FROM clause
  */
-case class IncompleteInsertSelectQuery[T, T2](into: IntoItem[_, _], select: Extractable[T] with Expression, distinct: Boolean) {
+case class IncompleteInsertSelectQuery[T, T2](into: IntoItem[_], select: Extractable[T] with Expression, distinct: Boolean) {
   def FROM(from: FromItem) = InsertSelectQuery(into, select, distinct, from)
 }
 
 /**
  * An INSERT INTO ... SELECT ... FROM query
  */
-case class InsertSelectQuery[T](into: IntoItem[_, _],
+case class InsertSelectQuery[T](into: IntoItem[_],
                                 select: Extractable[T] with Expression,
                                 distinct: Boolean,
                                 from: FromItem,
@@ -317,10 +343,13 @@ case class InsertSelectQuery[T](into: IntoItem[_, _],
    */
   def OFFSET(offset: BoundValue[Long]) = copy(offset = Some(offset))
 
+  def RETURNING[R](returning: Extractable[R] with Expression) = InsertSelectQueryReturning(this, returning)
+
   override def boundValues = select.boundValues ++ super.boundValues
 
   def apply(implicit conn: Connection): Int = {
-    SQL(insertExpression, boundValues).executeUpdate(conn)
+    val ps = SQL(insertExpression, boundValues).executeUpdate(conn)
+    ps.getUpdateCount()
   }
 
   def go(implicit conn: Connection) = apply(conn)
@@ -328,20 +357,53 @@ case class InsertSelectQuery[T](into: IntoItem[_, _],
   override def toString = queryExpression
 }
 
+trait QueryReturning[R] {
+  def returning: Extractable[R] with Expression
+
+  protected def originalExpression: String
+
+  protected def originalBoundValues: Seq[BoundValue[_]]
+
+  protected def returningExpression = returning.expression
+
+  protected def fullExpression = "%1$s\nRETURNING %2$s".format(originalExpression, returningExpression)
+  
+  private def boundValues = originalBoundValues ++ returning.boundValues
+
+  def apply(implicit conn: Connection): SelectResult[R] = {
+    val ps = SQL(fullExpression, boundValues).executeQuery(conn)
+    new SelectResult(ps, (rs: ResultSet) => returning.extract(rs, 1).value)
+  }
+
+  def go(implicit conn: Connection) = apply(conn)
+
+  override def toString = fullExpression
+}
+
+case class InsertSelectQueryReturning[T, R](query: InsertSelectQuery[T], returning: Extractable[R] with Expression) extends QueryReturning[R] {
+  protected def originalExpression = query.insertExpression
+
+  protected def originalBoundValues = query.boundValues
+  
+  override protected def returningExpression = returning.unaliasedExpression
+  
+  def insertExpression = fullExpression
+}
+
 /**
  * Syntax support for building InsertQueries using the INSERT keyword.
  */
 object INSERT {
-  def INTO[T, K](into: IntoItem[T, K]) = into
+  def INTO[T](into: IntoItem[T]) = into
 }
 
-case class IncompleteUpdateQuery[T](table: Table[T, _]) {
+case class IncompleteUpdateQuery[T](table: Table[T]) {
   def SET(set: Expression) = UpdateQuery(table, set)
 
-  def SET(row: T) = UpdateQuery(table, table.setExpression(row), Some(table.primaryKey == row))
+  def SET(row: T) = UpdateQuery(table, table.setExpression(row))
 }
 
-case class UpdateQuery[T](table: Table[T, _], set: Expression, where: Option[Condition] = None) {
+case class UpdateQuery[T](table: Table[T], set: Expression, where: Option[Condition] = None) {
   def WHERE(where: Condition) = UpdateQuery(table, set, Some(where))
 
   def baseExpression = "UPDATE %1$s\nSET %2$s".format(table.fromExpression, set.expression)
@@ -351,13 +413,24 @@ case class UpdateQuery[T](table: Table[T, _], set: Expression, where: Option[Con
     case None                   => baseExpression
   }
 
-  def apply(implicit conn: Connection): Int = {
-    var boundValues = where match {
-      case Some(where: Condition) => set.boundValues ++ where.boundValues
-      case None                   => set.boundValues
-    }
+  def boundValues = where match {
+    case Some(where: Condition) => set.boundValues ++ where.boundValues
+    case None                   => set.boundValues
+  }
 
-    SQL(updateExpression, boundValues).executeUpdate(conn)
+  def RETURNING[R](returning: Extractable[R] with Expression) = UpdateQueryReturning(this, returning)
+
+  def apply(implicit conn: Connection): Int = {
+    val ps = SQL(updateExpression, boundValues).executeUpdate(conn)
+    try {
+      ps.getUpdateCount()
+    } finally {
+      try {
+        ps.close()
+      } catch {
+        case e: Throwable => // ignore
+      }
+    }
   }
 
   def go(implicit conn: Connection) = apply(conn)
@@ -365,11 +438,19 @@ case class UpdateQuery[T](table: Table[T, _], set: Expression, where: Option[Con
   override def toString = updateExpression
 }
 
-object UPDATE {
-  def apply[T](table: Table[T, _]) = IncompleteUpdateQuery(table)
+case class UpdateQueryReturning[T, R](query: UpdateQuery[T], returning: Extractable[R] with Expression) extends QueryReturning[R] {
+  protected def originalExpression = query.updateExpression
+
+  protected def originalBoundValues = query.boundValues
+  
+  def updateExpression = fullExpression
 }
 
-case class DeleteQuery[T](table: Table[T, _], where: Option[Condition] = None) {
+object UPDATE {
+  def apply[T](table: Table[T]) = IncompleteUpdateQuery(table)
+}
+
+case class DeleteQuery[T](table: Table[T], where: Option[Condition] = None) {
   def WHERE(where: Condition) = DeleteQuery(table, Some(where))
 
   def baseExpression = "DELETE FROM %1$s".format(table.fromExpression)
@@ -379,13 +460,24 @@ case class DeleteQuery[T](table: Table[T, _], where: Option[Condition] = None) {
     case None                   => baseExpression
   }
 
-  def apply(implicit conn: Connection) = {
-    var boundValues = where match {
-      case Some(where: Condition) => where.boundValues
-      case None                   => Seq()
-    }
+  def RETURNING[R](returning: Extractable[R] with Expression) = DeleteQueryReturning(this, returning)
 
-    SQL(deleteExpression, boundValues).executeUpdate(conn)
+  def boundValues = where match {
+    case Some(where: Condition) => where.boundValues
+    case None                   => Seq()
+  }
+
+  def apply(implicit conn: Connection): Int = {
+    val ps = SQL(deleteExpression, boundValues).executeUpdate(conn)
+    try {
+      ps.getUpdateCount()
+    } finally {
+      try {
+        ps.close()
+      } catch {
+        case e: Throwable => // ignore
+      }
+    }
   }
 
   def go(implicit conn: Connection) = apply(conn)
@@ -393,6 +485,14 @@ case class DeleteQuery[T](table: Table[T, _], where: Option[Condition] = None) {
   override def toString = deleteExpression
 }
 
+case class DeleteQueryReturning[T, R](query: DeleteQuery[T], returning: Extractable[R] with Expression) extends QueryReturning[R] {
+  protected def originalExpression = query.deleteExpression
+
+  protected def originalBoundValues = query.boundValues
+  
+  def deleteExpression = fullExpression
+}
+
 object DELETE {
-  def FROM[T](table: Table[T, _]) = DeleteQuery(table)
+  def FROM[T](table: Table[T]) = DeleteQuery(table)
 }
