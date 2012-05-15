@@ -21,23 +21,21 @@ case class LineItem(id: Long = -1,
                     ts: Timestamp = new Timestamp(System.currentTimeMillis())
 
 // Assume that the entities Invoice and LineItem have been mapped by InvoiceTable and LineItemTable
-
-val i = new InvoiceTable() AS "i"
-val li = new LineItemTable() AS "li"
+// under db.i and db.li
 
 db.inTransaction { implicit conn =>
-  val insertedInvoiceId = INSERT INTO i(i.description) VALUES (?("A new invoice")) RETURNING i.id go
+  val insertedInvoiceId = INSERT INTO db.i(db.i.description) VALUES (?("A new invoice")) RETURNING db.i.id go;
   for (i <- 1 to 5) {
     val newLineItem = LineItem(invoice_id = insertedInvoiceId, amount = 5 * i)
-    INSERT INTO li VALUES (newLineItem) go
+    INSERT INTO db.li VALUES (newLineItem) go
   }
 }
 
 db.withConnection { implicit conn =>
   val query = (
-    SELECT (i.*, li.*)
-    FROM (i INNER_JOIN li ON i.id == li.invoice_id)
-    WHERE (i.description == ?("A new invoice")))
+    SELECT (db.i.*, db.li.*)
+    FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
+    WHERE (db.i.description == ?("A new invoice")))
     
   query foreach { row =>
     println(row._1.id)

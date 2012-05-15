@@ -53,6 +53,30 @@ object DocCompilationText {
   // To use our new type mappings, just import them
   import MyTypeMappings._
 
+  db.inTransaction { implicit conn =>
+    val insertedInvoiceId = INSERT INTO db.i(db.i.description) VALUES (?("A new invoice")) RETURNING db.i.id go;
+    for (i <- 1 to 5) {
+        val newLineItem = LineItem(invoice_id = insertedInvoiceId, amount = 5 * i)
+        INSERT INTO db.li VALUES (newLineItem) go
+      }
+  }
+  
+  db.withConnection { implicit conn =>
+      val query = (
+        SELECT (db.i.*, db.li.*)
+        FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id)
+        WHERE (db.i.description == ?("A new invoice")))
+        
+      query foreach { row =>
+        println(row._1.id)
+        println(row._1.description)
+        println(row._2.id)
+        println(row._2.invoice_id)
+        println(row._2.amount)
+        println(row._2.ts)
+      }
+    }
+
   var query = SELECT(db.invoice.id) FROM (db.invoice)
 
   db.withConnection { conn =>
