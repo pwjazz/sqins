@@ -271,7 +271,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
     val query: SelectQuery[Tuple2[Long, String]] = SELECT(i.id, i.description) FROM i
   }
 
-  it should "be able to contain joins" in {
+  it should "be able to contain INNER joins" in {
     val query: SelectQuery[Tuple2[Invoice, LineItem]] = (
       SELECT(i.*, li.*)
       FROM (i INNER_JOIN li ON i.id == li.invoice_id))
@@ -284,6 +284,43 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       query(conn).foreach(row => {
         row._1.id should equal(1)
         row._1.description should equal("An invoice")
+        row._2.id should equal(1)
+        row._2.invoice_id should equal(1)
+        row._2.amount should equal(56.78)
+      })
+    }
+  }
+  
+  it should "be able to contain LEFT OUTER joins" in {
+    val query: SelectQuery[Tuple2[Invoice, Option[Long]]] = (
+      SELECT(i.*, li.id.?)
+      FROM (i LEFT_OUTER_JOIN li ON i.id == li.invoice_id))
+
+    query.queryExpression should equal(
+      """|SELECT i.id, i.description, i.image, li.id
+           |FROM invoice AS i LEFT OUTER JOIN line_item AS li ON i.id = li.invoice_id""".stripMargin)
+
+    db.withConnection { implicit conn =>
+      query(conn).foreach(row => {
+        row._1.id should equal(1)
+        row._1.description should equal("An invoice")
+        row._2 should equal(Some(1))
+      })
+    }
+  }
+  
+  it should "be able to contain RIGHT OUTER joins" in {
+    val query: SelectQuery[Tuple2[Option[Invoice], LineItem]] = (
+      SELECT(i.*.?, li.*)
+      FROM (i RIGHT_OUTER_JOIN li ON i.id == ?(-1)))
+
+    query.queryExpression should equal(
+      """|SELECT i.id, i.description, i.image, li.id, li.invoice_id, li.amount, li.ts
+           |FROM invoice AS i RIGHT OUTER JOIN line_item AS li ON i.id = ?""".stripMargin)
+
+    db.withConnection { implicit conn =>
+      query(conn).foreach(row => {
+        row._1 should equal (None)
         row._2.id should equal(1)
         row._2.invoice_id should equal(1)
         row._2.amount should equal(56.78)

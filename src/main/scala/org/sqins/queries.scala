@@ -73,7 +73,7 @@ class SQLError(sql: SQL, cause: Exception) extends RuntimeException("Error execu
 /**
  * A SELECT query missing its FROM clause.
  */
-case class IncompleteSelectQuery[T](select: Extractable[T] with Expression, distinct: Boolean) {
+case class IncompleteSelectQuery[T](select: Extractable[T], distinct: Boolean) {
   def FROM(from: FromItem) = SelectQuery(select, distinct, from)
 }
 
@@ -81,7 +81,7 @@ case class IncompleteSelectQuery[T](select: Extractable[T] with Expression, dist
  * Base class for all variants of SELECT query, including SELECT and INSERT INTO ... SELECT ...
  */
 private[sqins] trait BaseSelectQuery[T] extends ScalarExpression with Extractable[T] {
-  def select: Extractable[T] with Expression
+  def select: Extractable[T]
   def distinct: Boolean
   def from: FromItem
   def where: Option[Condition]
@@ -133,7 +133,8 @@ private[sqins] trait BaseSelectQuery[T] extends ScalarExpression with Extractabl
   def extract(rs: ResultSet, position: Int) = select.extract(rs, position)
 
   override def boundValues = {
-    var boundValues = select.boundValues
+    var boundValues = select.boundValues ++ from.boundValues
+    
     where match {
       case Some(where: Condition) => boundValues ++= where.boundValues
       case None                   => // ignore
@@ -167,7 +168,7 @@ private[sqins] trait BaseSelectQuery[T] extends ScalarExpression with Extractabl
 /**
  * A SELECT query that can be executed as a function.
  */
-case class SelectQuery[T](select: Extractable[T] with Expression,
+case class SelectQuery[T](select: Extractable[T],
                           distinct: Boolean,
                           from: FromItem,
                           where: Option[Condition] = None,
@@ -210,9 +211,9 @@ case class SelectQuery[T](select: Extractable[T] with Expression,
  * Syntax support for building SelectQuerys using the SELECT keyword.
  */
 object SELECT {
-  def apply[T](expression: Extractable[T] with Expression) = IncompleteSelectQuery(expression, false)
+  def apply[T](expression: Extractable[T]) = IncompleteSelectQuery(expression, false)
 
-  def DISTINCT[T](expression: Extractable[T] with Expression) = IncompleteSelectQuery(expression, true)
+  def DISTINCT[T](expression: Extractable[T]) = IncompleteSelectQuery(expression, true)
 }
 
 /**
@@ -254,7 +255,7 @@ protected class SelectResultIterator[T](ps: PreparedStatement, rowReader: (Resul
 case class InsertValuesQuery[T](into: IntoItem[T], values: Seq[BoundValue[_]]) {
   def insertExpression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
 
-  def RETURNING[R](returning: Extractable[R] with Expression) = InsertValuesQueryReturning(this, returning)
+  def RETURNING[R](returning: Extractable[R]) = InsertValuesQueryReturning(this, returning)
 
   def apply(implicit conn: Connection): Int = {
     val ps = SQL(insertExpression, values).executeUpdate(conn)
@@ -266,7 +267,7 @@ case class InsertValuesQuery[T](into: IntoItem[T], values: Seq[BoundValue[_]]) {
   override def toString = insertExpression
 }
 
-case class InsertValuesQueryReturning[T, R](query: InsertValuesQuery[T], returning: Extractable[R] with Expression) {
+case class InsertValuesQueryReturning[T, R](query: InsertValuesQuery[T], returning: Extractable[R]) {
   def insertExpression = "%1$s\nRETURNING %2$s".format(query.insertExpression, returning.unaliasedExpression)
 
   def apply(implicit conn: Connection): R = {
@@ -300,7 +301,7 @@ case class InsertValuesQueryReturning[T, R](query: InsertValuesQuery[T], returni
 /**
  * An INSERT INTO ... SELECT ... FROM query without the FROM clause
  */
-case class IncompleteInsertSelectQuery[T, T2](into: IntoItem[_], select: Extractable[T] with Expression, distinct: Boolean) {
+case class IncompleteInsertSelectQuery[T, T2](into: IntoItem[_], select: Extractable[T], distinct: Boolean) {
   def FROM(from: FromItem) = InsertSelectQuery(into, select, distinct, from)
 }
 
@@ -308,7 +309,7 @@ case class IncompleteInsertSelectQuery[T, T2](into: IntoItem[_], select: Extract
  * An INSERT INTO ... SELECT ... FROM query
  */
 case class InsertSelectQuery[T](into: IntoItem[_],
-                                select: Extractable[T] with Expression,
+                                select: Extractable[T],
                                 distinct: Boolean,
                                 from: FromItem,
                                 where: Option[Condition] = None,
@@ -343,7 +344,7 @@ case class InsertSelectQuery[T](into: IntoItem[_],
    */
   def OFFSET(offset: BoundValue[Long]) = copy(offset = Some(offset))
 
-  def RETURNING[R](returning: Extractable[R] with Expression) = InsertSelectQueryReturning(this, returning)
+  def RETURNING[R](returning: Extractable[R]) = InsertSelectQueryReturning(this, returning)
 
   override def boundValues = select.boundValues ++ super.boundValues
 
@@ -358,7 +359,7 @@ case class InsertSelectQuery[T](into: IntoItem[_],
 }
 
 trait QueryReturning[R] {
-  def returning: Extractable[R] with Expression
+  def returning: Extractable[R]
 
   protected def originalExpression: String
 
@@ -380,7 +381,7 @@ trait QueryReturning[R] {
   override def toString = fullExpression
 }
 
-case class InsertSelectQueryReturning[T, R](query: InsertSelectQuery[T], returning: Extractable[R] with Expression) extends QueryReturning[R] {
+case class InsertSelectQueryReturning[T, R](query: InsertSelectQuery[T], returning: Extractable[R]) extends QueryReturning[R] {
   protected def originalExpression = query.insertExpression
 
   protected def originalBoundValues = query.boundValues
@@ -418,7 +419,7 @@ case class UpdateQuery[T](table: Table[T], set: Expression, where: Option[Condit
     case None                   => set.boundValues
   }
 
-  def RETURNING[R](returning: Extractable[R] with Expression) = UpdateQueryReturning(this, returning)
+  def RETURNING[R](returning: Extractable[R]) = UpdateQueryReturning(this, returning)
 
   def apply(implicit conn: Connection): Int = {
     val ps = SQL(updateExpression, boundValues).executeUpdate(conn)
@@ -438,7 +439,7 @@ case class UpdateQuery[T](table: Table[T], set: Expression, where: Option[Condit
   override def toString = updateExpression
 }
 
-case class UpdateQueryReturning[T, R](query: UpdateQuery[T], returning: Extractable[R] with Expression) extends QueryReturning[R] {
+case class UpdateQueryReturning[T, R](query: UpdateQuery[T], returning: Extractable[R]) extends QueryReturning[R] {
   protected def originalExpression = query.updateExpression
 
   protected def originalBoundValues = query.boundValues
@@ -460,7 +461,7 @@ case class DeleteQuery[T](table: Table[T], where: Option[Condition] = None) {
     case None                   => baseExpression
   }
 
-  def RETURNING[R](returning: Extractable[R] with Expression) = DeleteQueryReturning(this, returning)
+  def RETURNING[R](returning: Extractable[R]) = DeleteQueryReturning(this, returning)
 
   def boundValues = where match {
     case Some(where: Condition) => where.boundValues
@@ -485,7 +486,7 @@ case class DeleteQuery[T](table: Table[T], where: Option[Condition] = None) {
   override def toString = deleteExpression
 }
 
-case class DeleteQueryReturning[T, R](query: DeleteQuery[T], returning: Extractable[R] with Expression) extends QueryReturning[R] {
+case class DeleteQueryReturning[T, R](query: DeleteQuery[T], returning: Extractable[R]) extends QueryReturning[R] {
   protected def originalExpression = query.deleteExpression
 
   protected def originalBoundValues = query.boundValues

@@ -389,13 +389,41 @@ db.withConnection { implicit conn =>
 
 #### Joins
 
-We can also join across tables.  Right now, only INNER_JOIN is supported, but outer joins are on the roadmap.
+We can also join across tables, using INNER_JOIN, LEFT_OUTER_JOIN and RIGHT_OUTER_JOIN.
 
 ```scala
 val query4 = (
   SELECT (db.i.*, db.li.*)
   FROM (db.i INNER_JOIN db.li ON db.i.id == db.li.invoice_id))
   
+db.withConnection { implicit conn => 
+  query4.foreach { row: Tuple2[Invoice, LineItem] =>
+    println(row._1.id * 5)
+    println(row._1.description + " more string")
+    println(row._1.image)
+    println(row._2.id * 4)
+    println(row._2.invoice_id)
+    println(row._2.amount)
+    println(row._2.ts)
+  }
+}   
+```
+
+When using outer joins, some values may actually come back null.  We use the .? operator to turn such select arguments
+into Option values.
+```scala
+val query4_1: SelectQuery[Tuple2[Invoice, Option[LineItem]]] = (
+  SELECT (db.i.*, db.li.*.?)
+  FROM (db.i LEFT_OUTER_JOIN db.li ON db.i.id == db.li.invoice_id)))
+```
+
+The .? operator also works on individual columns:
+```scala
+val query4_1: SelectQuery[Tuple2[Invoice, Option[Long]]] = (
+  SELECT (db.i.*, db.li.id.?)
+  FROM (db.i LEFT_OUTER_JOIN db.li ON db.i.id == db.li.invoice_id)))
+```
+
 db.withConnection { implicit conn => 
   query4.foreach { row: Tuple2[Invoice, LineItem] =>
     println(row._1.id * 5)
@@ -866,7 +894,7 @@ An instance of a case class representing a row from the table being inserted/upd
 
 *from_item* is:
 ```
-table [INNER_JOIN table ON condition ...]
+table [{ INNER_JOIN | LEFT_OUTER_JOIN | RIGHT_OUTER_JOIN } table ON condition ...]
 ```
 
 *condition* is:
@@ -906,7 +934,6 @@ EXISTS select_query
 * All queries
     * Indentation in query output for better readability
 * SELECT queries
-    * Support for left and right outer joins (includes operator similar to ScalaQuery ? to turn columns from an outer join into Option values)
     * Support for UNION, INTERSECT and EXCEPT
     
 ### Release 0.2

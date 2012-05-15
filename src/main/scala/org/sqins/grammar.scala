@@ -57,11 +57,11 @@ private[sqins] trait Expression {
 /**
  * Something that can be extracted from a JDBC ResultSet.
  */
-private[sqins] trait Extractable[+T] {
+private[sqins] trait Extractable[+T] extends Expression {
   /**
    * Extract the value from the given ResultSet.
    */
-  def extract(rs: ResultSet, position: Int): Extraction[T]
+  def extract(rs: ResultSet, position: Int): Extraction[T] 
 }
 
 /**
@@ -147,6 +147,17 @@ private[sqins] trait ScalarValue[+T] extends ScalarExpression with Extractable[T
   def IN[U >: T](query: SelectQuery[U]) = InSelectQueryCondition(this, query)
   
   def IN[U >: T](vals: Seq[BoundValue[U]]) = InSequenceCondition(this, vals)
+  
+  def ?[U >: T](implicit typeMapping: TypeMapping[Option[U]]) = OptionOfScalarValue(this, typeMapping)
+}
+
+case class OptionOfScalarValue[T](scalarValue: ScalarValue[T], typeMapping: TypeMapping[Option[T]]) extends Extractable[Option[T]] {
+  def expression = scalarValue.expression
+  override def selectExpression = scalarValue.selectExpression
+  override def unaliasedExpression = scalarValue.unaliasedExpression
+  override def boundValues = scalarValue.boundValues
+  
+  def extract(rs: ResultSet, position: Int) = typeMapping.get(rs, position)
 }
 
 /**
@@ -164,7 +175,7 @@ case class CalculatedValue[+T](scalarValue: ScalarValue[T], operator: String, ot
 /**
  * An alias for Value.
  */
-case class Alias[+T, +E <: ScalarValue[T]](aliased: E, alias: String) extends Extractable[T] with Expression {
+case class Alias[+T, +E <: ScalarValue[T]](aliased: E, alias: String) extends Extractable[T] {
   def expression = aliased.expression
 
   override def selectExpression = "%1$s AS %2$s".format(aliased.expression, alias)
@@ -254,7 +265,7 @@ private[sqins] trait IntoItem[T] {
   /**
    * Start to build the SELECT clause of this INSERT query.
    */
-  def SELECT[V](select: Extractable[V] with Expression) = IncompleteInsertSelectQuery(this, select, false)
+  def SELECT[V](select: Extractable[V]) = IncompleteInsertSelectQuery(this, select, false)
 }
 
 /**
@@ -264,6 +275,12 @@ private[sqins] trait FromItem {
   def fromExpression: String
 
   def INNER_JOIN(right: Relation) = IncompleteJoin(this, "INNER JOIN", right)
+  
+  def LEFT_OUTER_JOIN(right: Relation) = IncompleteJoin(this, "LEFT OUTER JOIN", right)
+  
+  def RIGHT_OUTER_JOIN(right: Relation) = IncompleteJoin(this, "RIGHT OUTER JOIN", right)
+  
+  def boundValues = Seq[BoundValue[_]]()
 }
 
 /**
@@ -281,6 +298,8 @@ case class IncompleteJoin(left: FromItem, joinType: String, right: Relation) {
  */
 case class Join(left: FromItem, joinType: String, right: Relation, on: Condition) extends FromItem {
   def fromExpression = "%1$s %2$s %3$s ON %4$s".format(left.fromExpression, joinType, right.fromExpression, on.expression)
+  
+  override def boundValues = left.boundValues ++ right.boundValues ++ on.boundValues
 }
 
 /**
@@ -434,7 +453,7 @@ case class SetRowExpression[T, K](table: Table[T], row: T) extends Expression {
 /**
  * Represents all columns of a table in a SELECT clause.
  */
-case class Projection[T, K](table: Table[T]) extends ScalarValue[T] {
+case class Projection[T](table: Table[T]) extends ScalarValue[T] {
   def expression = table.columns.map { column => column.expression }.mkString(", ")
 
   override def selectExpression = table.columns.map { column => column.selectExpression }.mkString(", ")
@@ -464,6 +483,29 @@ case class Projection[T, K](table: Table[T]) extends ScalarValue[T] {
           columnValues,
           constructor.getParameterTypes.map { clazz => clazz.getName }.mkString(", ")),
         e)
+    }
+  }
+  
+  def ? = OptionOfProjection(this)
+}
+
+case class OptionOfProjection[T](projection: Projection[T]) extends Extractable[Option[T]] {
+  def expression = projection.expression
+  override def selectExpression = projection.selectExpression
+  override def unaliasedExpression = projection.unaliasedExpression
+  override def boundValues = projection.boundValues
+  
+  def extract(rs: ResultSet, position: Int) = {
+    // Check if any of the columns are non-null
+    // Get column values
+    var columnsRead = 0
+    val firstNonNullColumn = projection.table.columns.find { column => rs.getObject(position + columnsRead) != null }
+    // TODO: the below assumes 1 database column per value type.  This may change in future.
+    firstNonNullColumn match {
+      case Some(_) => {
+        Extraction(Some(projection.extract(rs, position).value), projection.table.columns.length)
+      }
+      case None => Extraction(None, projection.table.columns.length)
     }
   }
 }

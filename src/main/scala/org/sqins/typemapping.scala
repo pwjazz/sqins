@@ -50,14 +50,14 @@ trait TypeMapping[T] {
  * to perform the actual getting and setting.
  */
 class OptionTypeMapping[T](typeMapping: TypeMapping[T]) extends TypeMapping[Option[T]] {
-  def _get(rs: ResultSet, position: Int) = rs.getObject(position) match {
-    case Some(value: T) => Extraction(Some(value), 1)
-    case _              => Extraction(None, 1)
+  def _get(rs: ResultSet, position: Int) = {
+    val trialRead = rs.getObject(position)
+    if (trialRead != null) Extraction(Some(typeMapping.get(rs, position).value), 1) else Extraction(None, 1)
   }
 
   def _set(ps: PreparedStatement, position: Int, value: Option[T]) = value match {
     case Some(value: T) => typeMapping.set(ps, position, value)
-    case _              => ps.setObject(position, null)
+    case None              => ps.setObject(position, null)
   }
 }
 
