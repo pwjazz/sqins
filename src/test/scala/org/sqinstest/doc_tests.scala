@@ -54,7 +54,11 @@ object DocCompilationText {
   import MyTypeMappings._
 
   db.inTransaction { implicit conn =>
-    val insertedInvoiceId = INSERT INTO db.i(db.i.description) VALUES (?("A new invoice")) RETURNING db.i.id go;
+    val insertedInvoiceId = (
+        INSERT INTO db.i(db.i.description)
+        VALUES (?("A new invoice"))
+        RETURNING db.i.id)
+        
     for (i <- 1 to 5) {
         val newLineItem = LineItem(invoice_id = insertedInvoiceId, amount = 5 * i)
         INSERT INTO db.li VALUES (newLineItem) go

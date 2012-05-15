@@ -24,7 +24,11 @@ case class LineItem(id: Long = -1,
 // under db.i and db.li
 
 db.inTransaction { implicit conn =>
-  val insertedInvoiceId = INSERT INTO db.i(db.i.description) VALUES (?("A new invoice")) RETURNING db.i.id go;
+  val insertedInvoiceId = (
+    INSERT INTO db.i(db.i.description)
+    VALUES (?("A new invoice"))
+    RETURNING db.i.id)
+    
   for (i <- 1 to 5) {
     val newLineItem = LineItem(invoice_id = insertedInvoiceId, amount = 5 * i)
     INSERT INTO db.li VALUES (newLineItem) go
@@ -613,9 +617,15 @@ Often, you may want to return the primary key or the whole inserted row.  INSERT
 causes the query to return whatever was specified in the RETURNING clause.
 ```scala
 db.withConnection { implicit conn =>
-  val insertedId: Long = INSERT INTO db.invoice(db.invoice.description) VALUES (?("My Description")) RETURNING db.invoice.id
+  val insertedId: Long = (
+    INSERT INTO db.invoice(db.invoice.description)
+    VALUES (?("My Description"))
+    RETURNING db.invoice.id)
   
-  val insertedInvoice: Invoice = INSERT INTO db.invoice(db.invoice.description) VALUES (?("My Description")) RETURNING db.invoice.*
+  val insertedInvoice: Invoice = (
+    INSERT INTO db.invoice(db.invoice.description)
+    VALUES (?("My Description"))
+    RETURNING db.invoice.*)
 }
 ```
 
