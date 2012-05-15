@@ -32,6 +32,7 @@ import java.sql.PreparedStatement
 import java.sql.Date
 import java.sql.Timestamp
 import java.sql.Connection
+import java.util.UUID
 
 /**
  * Pre-defined implicit type mappings and other implicit conversions.  sqins requires that these be brought into scope
@@ -139,6 +140,12 @@ object Implicits {
     def _set(ps: PreparedStatement, position: Int, value: Array[Byte]) = ps.setBytes(position, value)
   }
   implicit val OptionByteArrayTypeMapping = new OptionTypeMapping(ByteArrayTypeMapping)
+  
+  implicit object UUIDTypeMapping extends TypeMapping[UUID] {
+    def _get(rs: ResultSet, position: Int) = Extraction(UUID.fromString(rs.getString(position)), 1)
+    def _set(ps: PreparedStatement, position: Int, value: UUID) = ps.setString(position, value.toString())
+  }
+  implicit val OptionUUIDTypeMapping = new OptionTypeMapping(UUIDTypeMapping)
 
   // Automatically convert tuples of expressions into single Expressions
   implicit def tuple2ToExpression[T1 <: Expression, T2 <: Expression](tuple: Tuple2[T1, T2]) = CompoundExpression2(tuple._1, tuple._2)

@@ -29,10 +29,12 @@ package org.sqins
 
 import java.sql.PreparedStatement
 import java.sql.ResultSet
+import scala.annotation.implicitNotFound
 
 /**
  * A TypeMapping handles retrieving a Field's value from a ResultSet and for setting parameters on a PreparedStatement.
  */
+@implicitNotFound(msg = "Cannot find implicit TypeMapping for ${T}.  Please make sure you've imported org.sqins.Implicits._ or defined your own TypeMapping for ${T}")
 trait TypeMapping[T] {
   def get(rs: ResultSet, position: Int) = _get(rs, position)
 

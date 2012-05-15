@@ -227,6 +227,7 @@ sqins includes TypeMappings for the following Scala types (and their related Opt
 `scala.math.BigDecimal`  
 `java.sql.Date`  
 `java.sql.Timestamp`  
+`java.util.UUID` (mapped to String)
 `Array[Byte]`  
 
 #### Defining Custom TypeMappings
@@ -853,7 +854,6 @@ EXISTS select_query
 
 * All queries
     * Make sure we have a proper model for resource cleanup (prepared statements, resultsets, connections)
-    * Provide nicer error messages by using @implicitNotFound
     * Support for tables with no primary key
     * Support for tables with multi-column primary keys
     * Indentation in query output for better readability
