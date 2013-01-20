@@ -96,7 +96,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       insertLineItem(lineItem) go
     }
   }
-
+  
   it should "also allow INSERT ... SELECT FROM semantics" in {
     val query = (INSERT INTO invoice(invoice.description, invoice.image)
       SELECT (invoice.description, invoice.image) FROM invoice WHERE invoice.id == ?(-1))
@@ -631,6 +631,22 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
                                              |RETURNING li.id""".stripMargin)
       val deleted:SelectResult[Long] = query go
     }
+  }
+  
+  "The INSERT function" should "be able to use a RETURNING_IDS clause" in {
+    // Define some query builder methods
+    def insertInvoice(invoice: Invoice) = (
+      INSERT INTO i(i.description)
+      VALUES (?(invoice.description))
+      RETURNING_IDS (i.id))
+      
+    val invoice = Invoice(description = "An invoice")
+    db.withConnection { implicit conn =>
+      val query = insertInvoice(invoice)
+      query.insertExpression should equal("""|INSERT INTO invoice (description) VALUES(?)""".stripMargin)
+      insertedInvoiceId = query go
+    }
+    insertedInvoiceId should equal(3)
   }
 
   case class MyType(wrapped: String)

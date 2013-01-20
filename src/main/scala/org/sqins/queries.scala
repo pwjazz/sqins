@@ -30,6 +30,7 @@ package org.sqins
 import java.sql.Connection
 import java.sql.PreparedStatement
 import java.sql.ResultSet
+import java.sql.Statement
 
 /**
  * A generic SQL query that takes a text query and an optional seq of parameters.
@@ -45,8 +46,11 @@ case class SQL(query: String, params: Seq[BoundValue[_]] = Seq()) {
     }
   }
 
-  def executeUpdate(implicit conn: Connection) = {
-    val ps = conn.prepareStatement(query)
+  def executeUpdate(implicit conn: Connection, returnGeneratedKeys: Boolean = false) = {
+    val ps = returnGeneratedKeys match {
+      case true => conn.prepareStatement(query, Statement.RETURN_GENERATED_KEYS)
+      case false => conn.prepareStatement(query)
+    }
     try {
       buildStatement(ps).executeUpdate
       ps
@@ -256,6 +260,8 @@ case class InsertValuesQuery[T](into: IntoItem[T], values: Seq[BoundValue[_]]) {
   def insertExpression = "INSERT INTO " + into.intoExpression + " VALUES(" + values.map(_ => "?").mkString(", ") + ")"
 
   def RETURNING[R](returning: Extractable[R]) = InsertValuesQueryReturning(this, returning)
+  
+  def RETURNING_IDS[R](returning: Extractable[R]) = InsertValuesQueryReturnIDS(this, returning)
 
   def apply(implicit conn: Connection): Int = {
     val ps = SQL(insertExpression, values).executeUpdate(conn)
@@ -277,6 +283,40 @@ case class InsertValuesQueryReturning[T, R](query: InsertValuesQuery[T], returni
       try {
         rs.next()
         returning.extract(rs, 1).value
+      } finally {
+        try {
+          rs.close()
+        } catch {
+          case e: Throwable => // ignore
+        }
+      }
+    } finally {
+      try {
+        ps.close()
+      } catch {
+        case e: Throwable => // ignore
+      }
+    }
+  }
+
+  def go(implicit conn: Connection) = apply(conn)
+
+  override def toString = insertExpression
+}
+
+case class InsertValuesQueryReturnIDS[T, R](query: InsertValuesQuery[T], returning: Extractable[R]) {
+  def insertExpression = query.insertExpression
+  
+  def apply(implicit conn: Connection): R = {
+    val ps = SQL(insertExpression, query.values).executeUpdate(conn, true)
+    try {
+      val rs = ps.getGeneratedKeys()
+      try {
+        if (rs.next()) {
+          returning.extract(rs, 1).value
+        } else {
+          throw new RuntimeException("No keys available") 
+        }
       } finally {
         try {
           rs.close()
