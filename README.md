@@ -828,7 +828,7 @@ An `INSERT` query is:
 ```
 INSERT INTO table [(column [, ...])]
   { VALUES ({ bound_value [, ...] | row_object }) |  a SELECT query }
-  [RETURNING extractable_expression]
+  [RETURNING extractable_expression | RETURNING_IDS extractable_expression]
 ```
 
 An `UPDATE` query is:
