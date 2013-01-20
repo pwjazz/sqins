@@ -76,7 +76,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       VALUES (?(invoice.description))
       RETURNING (i.id))
 
-    val invoice = Invoice(description = "An invoice")
+    val invoice = new Invoice(description = "An invoice")
     db.withConnection { implicit conn =>
       insertedInvoiceId = insertInvoice(invoice) go
     }
@@ -91,7 +91,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       INSERT INTO li
       VALUES (lineItem))
 
-    val lineItem = LineItem(invoice_id = insertedInvoiceId, amount = 25)
+    val lineItem = new LineItem(invoice_id = insertedInvoiceId, amount = 25)
     db.withConnection { implicit conn =>
       insertLineItem(lineItem) go
     }
@@ -165,7 +165,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
   }
 
   it should "allow setting whole rows" in {
-    val newLineItem = LineItem(id = 1, invoice_id = 1, amount = 56.78)
+    val newLineItem = new LineItem(id = 1, invoice_id = 1, amount = 56.78)
 
     val query = UPDATE(li) SET (newLineItem) WHERE (li.id == ?(newLineItem.id))
 
@@ -178,7 +178,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
   }
 
   it should "support a RETURNING clause" in {
-    val newLineItem = LineItem(id = 1, invoice_id = 1, amount = 56.78)
+    val newLineItem = new LineItem(id = 1, invoice_id = 1, amount = 56.78)
 
     val query = (
       UPDATE(li)
@@ -199,7 +199,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
   }
 
   it should "allow setting values to correlated subqueries" in {
-    val newLineItem = LineItem(id = 1, invoice_id = 1, amount = 56.78)
+    val newLineItem = new LineItem(id = 1, invoice_id = 1, amount = 56.78)
 
     val li2 = line_item AS "li2"
 
@@ -598,7 +598,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       new java.io.File("test_image.jpg"))
       .map(_.toByte)
       .toArray
-    val invoice = Invoice(description = "An invoice", image = Some(imageData))
+    val invoice = new Invoice(description = "An invoice", image = Some(imageData))
     db.withConnection { implicit conn =>
       insertInvoice(invoice)(conn)
     }
@@ -640,7 +640,7 @@ class CoreSpec extends FlatSpec with ShouldMatchers {
       VALUES (?(invoice.description))
       RETURNING_IDS (i.id))
       
-    val invoice = Invoice(description = "An invoice")
+    val invoice = new Invoice(description = "An invoice")
     db.withConnection { implicit conn =>
       val query = insertInvoice(invoice)
       query.insertExpression should equal("""|INSERT INTO invoice (description) VALUES(?)""".stripMargin)

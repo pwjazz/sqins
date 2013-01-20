@@ -32,14 +32,14 @@ import org.sqins._
 import org.sqins.Implicits._
 
 // Define our Scala model
-case class Invoice(id: Long = -1,
-                   description: String,
-                   image: Option[Array[Byte]] = None) // Note - it would be smart to put images and other large binary data into their own tables to avoid reading them unnecessarily
+class Invoice(val id: Long = -1,
+              val description: String,
+              val image: Option[Array[Byte]] = None) // Note - it would be smart to put images and other large binary data into their own tables to avoid reading them unnecessarily
 
-case class LineItem(id: Long = -1,
-                    invoice_id: Long,
-                    amount: BigDecimal,
-                    ts: Timestamp = new Timestamp(System.currentTimeMillis))
+class LineItem(val id: Long = -1,
+               val invoice_id: Long,
+               val amount: BigDecimal,
+               val ts: Timestamp = new Timestamp(System.currentTimeMillis))
 
 // Define our database tables
 class InvoiceTable extends Table[Invoice]("invoice") {

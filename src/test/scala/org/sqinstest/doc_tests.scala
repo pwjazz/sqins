@@ -60,7 +60,7 @@ object DocCompilationText {
         RETURNING db.i.id)
         
     for (i <- 1 to 5) {
-        val newLineItem = LineItem(invoice_id = insertedInvoiceId, amount = 5 * i)
+        val newLineItem = new LineItem(invoice_id = insertedInvoiceId, amount = 5 * i)
         INSERT INTO db.li VALUES (newLineItem) go
       }
   }
@@ -215,7 +215,7 @@ object DocCompilationText {
     val rowsInserted: Int = INSERT INTO db.invoice(db.invoice.description) VALUES (?("My Description"))
   }
 
-  val newInvoice = Invoice(description = "My Description")
+  val newInvoice = new Invoice(description = "My Description")
 
   db.withConnection { implicit conn =>
     val rowsInserted: Int = INSERT INTO db.invoice VALUES (newInvoice)
@@ -244,7 +244,7 @@ object DocCompilationText {
       SET (db.invoice.description := ?("New description")))
   }
 
-  val updatedInvoice = Invoice(id = 5, description = "New description")
+  val updatedInvoice = new Invoice(id = 5, description = "New description")
 
   db.withConnection { implicit conn =>
     val numberOfUpdatedRows = (
