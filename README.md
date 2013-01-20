@@ -56,6 +56,7 @@ db.withConnection { implicit conn =>
 
  * Looks like SQL - if you know SQL, you pretty much know sqins.
  * Strongly typed - compile time checking for SQL syntax and column types.
+ * Optimized - it's not quite as fast as using pure JDBC, but it's definitely low fat
  * Not an ORM - sqins is just a SQL API.
  * Simple mapping - unlike an ORM, sqins just needs to know the most basic things about your tables and columns.
  * Extensible scalar types - sqins comes with support for basic types like numbers, strings and dates and makes it super-easy to define new type mappings.
@@ -950,6 +951,9 @@ EXISTS select_query
     * Indentation in query output for better readability
 * SELECT queries
     * Support for UNION, INTERSECT and EXCEPT
+* Database support
+    * PostgreSQL
+    * H2
     
 ### Release 0.2
 
