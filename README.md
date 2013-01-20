@@ -661,6 +661,17 @@ db.withConnection { implicit conn =>
 }
 ```
 
+Some databases don't support the RETURNING clause.  For these, it is still possible to get at the ids using Sqins'
+RETURNING_IDS clause.  Unlike RETURNING, this can only return auto-generated ids, not whole records.
+```scala
+db.withConnection { implicit conn =>
+  val insertedId: Long = (
+    INSERT INTO db.invoice(db.invoice.description)
+    VALUES (?("My Description"))
+    RETURNING_IDS db.invoice.id)
+}
+```
+
 INSERT queries also allow you to insert using a SELECT statement.
 
 ```scala
