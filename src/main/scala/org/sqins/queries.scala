@@ -98,37 +98,37 @@ private[sqins] trait BaseSelectQuery[T] extends ScalarExpression with Extractabl
       case true  => "SELECT DISTINCT"
       case false => "SELECT"
     }
-    var expression = "%1$s %2$s\nFROM %3$s".format(selectKeyword, select.selectExpression, from.fromExpression)
+    var expression = selectKeyword + " " + select.selectExpression + "\nFROM " + from.fromExpression
 
     where match {
-      case Some(where: Condition) => expression = "%1$s\nWHERE %2$s".format(expression, where.expression)
+      case Some(where: Condition) => expression = expression + "\nWHERE " + where.expression
       case None                   => // ignore
     }
 
     groupBy match {
-      case Some(groupBy: Expression) => expression = "%1$s\nGROUP BY %2$s".format(expression, groupBy.expression)
+      case Some(groupBy: Expression) => expression = expression + "\nGROUP BY " + groupBy.expression
       case None                      => // ignore
     }
 
     orderBy match {
-      case Some(orderBy: Expression) => expression = "%1$s\nORDER BY %2$s".format(expression, orderBy.expression)
+      case Some(orderBy: Expression) => expression = expression + "\nORDER BY " + orderBy.expression
       case None                      => // ignore
     }
 
     limit match {
-      case Some(limit: BoundValue[_]) => expression = "%1$s\nLIMIT ?".format(expression)
+      case Some(limit: BoundValue[_]) => expression = expression + "\nLIMIT ?"
       case None                          => // ignore
     }
 
     offset match {
-      case Some(offset: BoundValue[_]) => expression = "%1$s\nOFFSET ?".format(expression)
+      case Some(offset: BoundValue[_]) => expression = expression + "\nOFFSET ?"
       case None                           => // ignore
     }
 
     expression
   }
 
-  def expression = "(%1$s)".format(queryExpression)
+  def expression = "(" + queryExpression + ")"
 
   def extract(rs: ResultSet, position: Int) = select.extract(rs, position)
 
@@ -253,7 +253,7 @@ protected class SelectResultIterator[T](ps: PreparedStatement, rowReader: (Resul
  * An INSERT ... VALUES query
  */
 case class InsertValuesQuery[T](into: IntoItem[T], values: Seq[BoundValue[_]]) {
-  def insertExpression = "INSERT INTO %1$s VALUES(%2$s)".format(into.intoExpression, values.map(_ => "?").mkString(", "))
+  def insertExpression = "INSERT INTO " + into.intoExpression + " VALUES(" + values.map(_ => "?").mkString(", ") + ")"
 
   def RETURNING[R](returning: Extractable[R]) = InsertValuesQueryReturning(this, returning)
 
@@ -268,7 +268,7 @@ case class InsertValuesQuery[T](into: IntoItem[T], values: Seq[BoundValue[_]]) {
 }
 
 case class InsertValuesQueryReturning[T, R](query: InsertValuesQuery[T], returning: Extractable[R]) {
-  def insertExpression = "%1$s\nRETURNING %2$s".format(query.insertExpression, returning.unaliasedExpression)
+  def insertExpression = query.insertExpression + "\nRETURNING " + returning.unaliasedExpression
 
   def apply(implicit conn: Connection): R = {
     val ps = SQL(insertExpression, query.values ++ returning.boundValues).executeQuery(conn)
@@ -299,6 +299,13 @@ case class InsertValuesQueryReturning[T, R](query: InsertValuesQuery[T], returni
 }
 
 /**
+ * Start to build the SELECT clause of this INSERT query.
+ */
+case class InsertSelectQueryBuilder(into: IntoItem[_]) {
+  def SELECT[V](select: Extractable[V]) = IncompleteInsertSelectQuery(into, select, false)
+}
+
+/**
  * An INSERT INTO ... SELECT ... FROM query without the FROM clause
  */
 case class IncompleteInsertSelectQuery[T, T2](into: IntoItem[_], select: Extractable[T], distinct: Boolean) {
@@ -317,7 +324,7 @@ case class InsertSelectQuery[T](into: IntoItem[_],
                                 groupBy: Option[Expression] = None,
                                 limit: Option[BoundValue[Long]] = None,
                                 offset: Option[BoundValue[Long]] = None) extends BaseSelectQuery[T] {
-  def insertExpression = "INSERT INTO %1$s\n%2$s".format(into.intoExpression, this.queryExpression)
+  def insertExpression = "INSERT INTO " + into.intoExpression + "\n" + this.queryExpression
 
   /**
    * Add a WHERE clause.
@@ -367,7 +374,7 @@ trait QueryReturning[R] {
 
   protected def returningExpression = returning.expression
 
-  protected def fullExpression = "%1$s\nRETURNING %2$s".format(originalExpression, returningExpression)
+  protected def fullExpression = originalExpression + "\nRETURNING " + returningExpression
   
   private def boundValues = originalBoundValues ++ returning.boundValues
 
@@ -407,10 +414,10 @@ case class IncompleteUpdateQuery[T](table: Table[T]) {
 case class UpdateQuery[T](table: Table[T], set: Expression, where: Option[Condition] = None) {
   def WHERE(where: Condition) = UpdateQuery(table, set, Some(where))
 
-  def baseExpression = "UPDATE %1$s\nSET %2$s".format(table.fromExpression, set.expression)
+  def baseExpression = "UPDATE " + table.fromExpression + "\nSET " + set.expression
 
   def updateExpression = where match {
-    case Some(where: Condition) => "%1$s\nWHERE %2$s".format(baseExpression, where.expression)
+    case Some(where: Condition) => baseExpression + "\nWHERE " + where.expression
     case None                   => baseExpression
   }
 
@@ -454,10 +461,10 @@ object UPDATE {
 case class DeleteQuery[T](table: Table[T], where: Option[Condition] = None) {
   def WHERE(where: Condition) = DeleteQuery(table, Some(where))
 
-  def baseExpression = "DELETE FROM %1$s".format(table.fromExpression)
+  def baseExpression = "DELETE FROM " + table.fromExpression
 
   def deleteExpression = where match {
-    case Some(where: Condition) => "%1$s\nWHERE %2$s".format(baseExpression, where.expression)
+    case Some(where: Condition) => baseExpression + "\nWHERE " + where.expression
     case None                   => baseExpression
   }
 

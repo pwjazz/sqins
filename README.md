@@ -226,7 +226,8 @@ sqins includes TypeMappings for the following Scala types (and their related Opt
 `scala.math.BigDecimal`  
 `java.sql.Date`  
 `java.sql.Timestamp`  
-`java.util.UUID` (mapped to String)  
+`java.util.UUID` (mapped to String)
+`java.net.URL`   (mapped to String)  
 `Array[Byte]`  
 
 #### Defining Custom TypeMappings
@@ -321,6 +322,9 @@ db.withConnection { conn =>
   
   // To return everything, you could have done this:
   result.toList
+  
+  // To get just the first row, use the firstOption method
+  val first: Option[Long] = result.firstOption
   
   // The resulting list doesn't depend on the database Connection
 }

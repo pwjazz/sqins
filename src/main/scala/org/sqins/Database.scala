@@ -41,7 +41,7 @@ trait Database {
   /**
    * Execute a callback on the given connection using default autoCommit.
    */
-  def withConnection[T](fn: (Connection) => T) {
+  def withConnection[T](fn: (Connection) => T) = {
     val conn = openConnection()
     try {
       fn(conn)
@@ -54,11 +54,12 @@ trait Database {
    * Execute a callback on the given connection inside of a transaction, committing the transaction if and only if no
    * exceptions were thrown.
    */
-  def inTransaction[T](fn: (Connection) => T) {
+  def inTransaction[T](fn: (Connection) => T) = {
     val conn = openConnection()
     try {
-      fn(conn)
+      val result = fn(conn)
       conn.commit()
+      result
     } finally {
       conn.close()
     }

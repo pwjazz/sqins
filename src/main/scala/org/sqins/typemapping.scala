@@ -57,7 +57,7 @@ class OptionTypeMapping[T](typeMapping: TypeMapping[T]) extends TypeMapping[Opti
 
   def _set(ps: PreparedStatement, position: Int, value: Option[T]) = value match {
     case Some(value: T) => typeMapping.set(ps, position, value)
-    case None              => ps.setObject(position, null)
+    case None           => ps.setObject(position, null)
   }
 }
 

@@ -27,6 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 package org.sqins
 
+import java.net.URL
 import java.sql.ResultSet
 import java.sql.PreparedStatement
 import java.sql.Date
@@ -38,9 +39,13 @@ import java.util.UUID
  * Pre-defined implicit type mappings and other implicit conversions.  sqins requires that these be brought into scope
  * in order to build table definitions and queries.
  */
+
 object Implicits {
   // Allow Aliases to be treated as whatever was aliased
   implicit def aliasToAliased[T, E <: ScalarValue[T]](alias: Alias[T, E]) = alias.aliased
+  
+  // Allow IntoItems to be treated as InsertSelectQueryBuilders
+  implicit def intoItemToInsertSelectQueryBuilder[T](intoItem: IntoItem[T]) = InsertSelectQueryBuilder(intoItem)
   
   // Treat a SelectQuery as its result
   implicit def selectQueryToResult[T](query: SelectQuery[T])(implicit conn: Connection) = query(conn)
@@ -150,6 +155,12 @@ object Implicits {
     def _set(ps: PreparedStatement, position: Int, value: UUID) = ps.setString(position, value.toString())
   }
   implicit val OptionUUIDTypeMapping = new OptionTypeMapping(UUIDTypeMapping)
+  
+  implicit object URLTypeMapping extends TypeMapping[URL] {
+    def _get(rs: ResultSet, position: Int) = Extraction(new URL(rs.getString(position)), 1)
+    def _set(ps: PreparedStatement, position: Int, value: URL) = ps.setString(position, value.toString())
+  }
+  implicit val OptionURLTypeMapping = new OptionTypeMapping(URLTypeMapping)
 
   // Automatically convert tuples of expressions into single Expressions
   implicit def tuple2ToExpression[T1 <: Expression, T2 <: Expression](tuple: Tuple2[T1, T2]) = new CompoundExpression2(tuple._1, tuple._2)
