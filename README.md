@@ -597,7 +597,7 @@ val query8:SelectQuery[Tuple2[Long, BigDecimal]] = (
   GROUP_BY (db.i.id))
 ```
 
-Even better, add your functions for to your custom implicits for easy reuse.
+Even better, add your functions to your custom implicits for easy reuse.
 
 ```scala
 object MyImplicits {
