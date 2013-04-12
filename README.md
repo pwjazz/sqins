@@ -427,7 +427,6 @@ The .? operator also works on individual columns:
 val query4_1: SelectQuery[Tuple2[Invoice, Option[Long]]] = (
   SELECT (db.i.*, db.li.id.?)
   FROM (db.i LEFT_OUTER_JOIN db.li ON db.i.id == db.li.invoice_id)))
-```
 
 db.withConnection { implicit conn => 
   query4.foreach { row: Tuple2[Invoice, LineItem] =>
@@ -953,14 +952,15 @@ EXISTS select_query
     * Support for UNION, INTERSECT and EXCEPT
 * Database support
     * PostgreSQL
-    * H2
     
 ### Release 0.2
 
 * Database Support
-    * MySQL
-    * Oracle
-    * SqlServer
+    * h2
+
+* All queries
+    * Support for non-case classes
+    * Support for RETURNING_IDS clause (for databases that can't do RETURNING)
     
 ### Future Possibilities
 
