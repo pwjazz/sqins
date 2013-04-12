@@ -427,18 +427,6 @@ The .? operator also works on individual columns:
 val query4_1: SelectQuery[Tuple2[Invoice, Option[Long]]] = (
   SELECT (db.i.*, db.li.id.?)
   FROM (db.i LEFT_OUTER_JOIN db.li ON db.i.id == db.li.invoice_id)))
-
-db.withConnection { implicit conn => 
-  query4.foreach { row: Tuple2[Invoice, LineItem] =>
-    println(row._1.id * 5)
-    println(row._1.description + " more string")
-    println(row._1.image)
-    println(row._2.id * 4)
-    println(row._2.invoice_id)
-    println(row._2.amount)
-    println(row._2.ts)
-  }
-}   
 ```
 
 We're now enclosing the entire query expression in parentheses to support breaking it onto multiple lines.
